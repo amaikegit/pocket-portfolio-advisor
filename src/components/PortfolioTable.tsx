@@ -125,8 +125,9 @@ function EditableRow({
   );
 }
 
-export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTableProps) {
+export function PortfolioTable({ assets, onRemove, onUpdate, onFetchPrice }: PortfolioTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
   if (assets.length === 0) {
     return (
