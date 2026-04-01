@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { AddAssetDialog } from "@/components/AddAssetDialog";
 import { CSVImportDialog } from "@/components/CSVImportDialog";
 import { PortfolioTable } from "@/components/PortfolioTable";
 import { SummaryCards } from "@/components/SummaryCards";
-import { BarChart3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { BarChart3, RefreshCw, Loader2 } from "lucide-react";
 
 const Index = () => {
   const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchPrice, totals } = usePortfolio();
