@@ -31,6 +31,10 @@ const Index = () => {
             </h1>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={handleRefreshAll} disabled={refreshing}>
+              {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Atualizar Cotações
+            </Button>
             <CSVImportDialog onImport={importCSV} />
             <AddAssetDialog onAdd={addAsset} />
           </div>
