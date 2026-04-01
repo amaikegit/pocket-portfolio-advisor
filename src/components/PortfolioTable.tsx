@@ -17,7 +17,7 @@ interface PortfolioTableProps {
   assets: AssetCalculated[];
   onRemove: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Omit<Asset, "id">>) => void;
-  onFetchPrice: (id: string, ticker: string) => Promise<number>;
+  
 }
 
 const fmt = (v: number) =>
