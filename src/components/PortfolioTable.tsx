@@ -219,18 +219,6 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-0.5">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-accent-foreground"
-                      title="Buscar cotação"
-                      disabled={loadingId === a.id}
-                      onClick={async () => {
-                        setLoadingId(a.id);
-                        try {
-                          await onFetchPrice(a.id, a.ticker);
-                        } catch { /* toast handled externally if needed */ }
-                        setLoadingId(null);
-                      }}>
-                      {loadingId === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                    </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
                       onClick={() => setEditingId(a.id)}>
                       <Pencil className="h-3.5 w-3.5" />
