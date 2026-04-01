@@ -8,7 +8,14 @@ import { Button } from "@/components/ui/button";
 import { BarChart3, RefreshCw, Loader2 } from "lucide-react";
 
 const Index = () => {
-  const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchPrice, totals } = usePortfolio();
+  const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchAllPrices, totals } = usePortfolio();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefreshAll = async () => {
+    setRefreshing(true);
+    try { await fetchAllPrices(); } catch {}
+    setRefreshing(false);
+  };
 
   return (
     <div className="min-h-screen bg-background">
