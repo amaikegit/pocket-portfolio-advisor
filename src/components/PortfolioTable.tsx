@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trash2, Pencil, Check, X, RefreshCw, Loader2 } from "lucide-react";
+import { Trash2, Pencil, Check, X } from "lucide-react";
 import { Asset, AssetCalculated } from "@/types/portfolio";
 import { StarRating } from "@/components/StarRating";
 import {
@@ -17,7 +17,7 @@ interface PortfolioTableProps {
   assets: AssetCalculated[];
   onRemove: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Omit<Asset, "id">>) => void;
-  onFetchPrice: (id: string, ticker: string) => Promise<number>;
+  
 }
 
 const fmt = (v: number) =>
@@ -125,9 +125,8 @@ function EditableRow({
   );
 }
 
-export function PortfolioTable({ assets, onRemove, onUpdate, onFetchPrice }: PortfolioTableProps) {
+export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [loadingId, setLoadingId] = useState<string | null>(null);
 
   if (assets.length === 0) {
     return (
@@ -220,18 +219,6 @@ export function PortfolioTable({ assets, onRemove, onUpdate, onFetchPrice }: Por
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-0.5">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-accent-foreground"
-                      title="Buscar cotação"
-                      disabled={loadingId === a.id}
-                      onClick={async () => {
-                        setLoadingId(a.id);
-                        try {
-                          await onFetchPrice(a.id, a.ticker);
-                        } catch { /* toast handled externally if needed */ }
-                        setLoadingId(null);
-                      }}>
-                      {loadingId === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                    </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
                       onClick={() => setEditingId(a.id)}>
                       <Pencil className="h-3.5 w-3.5" />

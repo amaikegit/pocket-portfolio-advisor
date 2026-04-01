@@ -1,12 +1,21 @@
+import { useState } from "react";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { AddAssetDialog } from "@/components/AddAssetDialog";
 import { CSVImportDialog } from "@/components/CSVImportDialog";
 import { PortfolioTable } from "@/components/PortfolioTable";
 import { SummaryCards } from "@/components/SummaryCards";
-import { BarChart3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { BarChart3, RefreshCw, Loader2 } from "lucide-react";
 
 const Index = () => {
-  const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchPrice, totals } = usePortfolio();
+  const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchAllPrices, totals } = usePortfolio();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefreshAll = async () => {
+    setRefreshing(true);
+    try { await fetchAllPrices(); } catch {}
+    setRefreshing(false);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -22,6 +31,10 @@ const Index = () => {
             </h1>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={handleRefreshAll} disabled={refreshing}>
+              {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Atualizar Cotações
+            </Button>
             <CSVImportDialog onImport={importCSV} />
             <AddAssetDialog onAdd={addAsset} />
           </div>
@@ -31,7 +44,7 @@ const Index = () => {
       {/* Content */}
       <main className="container mx-auto px-4 py-6 space-y-6">
         <SummaryCards totals={totals} />
-        <PortfolioTable assets={calculatedAssets} onRemove={removeAsset} onUpdate={updateAsset} onFetchPrice={fetchPrice} />
+        <PortfolioTable assets={calculatedAssets} onRemove={removeAsset} onUpdate={updateAsset} />
       </main>
     </div>
   );

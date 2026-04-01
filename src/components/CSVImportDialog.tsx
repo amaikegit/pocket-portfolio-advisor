@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Upload } from "lucide-react";
+import { Upload, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -60,6 +60,24 @@ export function CSVImportDialog({ onImport }: CSVImportDialogProps) {
             onChange={handleFile}
             className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
           />
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2 w-full"
+            onClick={() => {
+              const template = "ticker;quantidade;preco_atual;preco_medio;total_investido;dy;pvp\nHGLG11;10;160.50;155.00;1550.00;1.20;0.95\n";
+              const blob = new Blob([template], { type: "text/csv;charset=utf-8;" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "modelo_carteira.csv";
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            <Download className="h-4 w-4" />
+            Baixar modelo CSV
+          </Button>
           {result && (
             <p className="text-sm text-positive font-medium">{result}</p>
           )}

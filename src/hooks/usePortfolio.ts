@@ -50,24 +50,28 @@ export function usePortfolio() {
     return newAssets.length;
   }, []);
 
-  const fetchPrice = useCallback(async (id: string, ticker: string) => {
+  const fetchAllPrices = useCallback(async () => {
+    const tickers = assets.map((a) => a.ticker).join(",");
+    if (!tickers) return;
     try {
       const res = await fetch(
-        `https://brapi.dev/api/quote/${encodeURIComponent(ticker)}?token=demo`
+        `https://brapi.dev/api/quote/${encodeURIComponent(tickers)}?token=demo`
       );
       const data = await res.json();
-      const price = data?.results?.[0]?.regularMarketPrice;
-      if (typeof price === "number") {
-        setAssets((prev) =>
-          prev.map((a) => (a.id === id ? { ...a, currentPrice: price, isManualPrice: false } : a))
-        );
-        return price;
-      }
-      throw new Error("Preço não encontrado");
+      const results: { symbol: string; regularMarketPrice: number }[] = data?.results || [];
+      setAssets((prev) =>
+        prev.map((a) => {
+          const match = results.find((r) => r.symbol === a.ticker);
+          if (match && typeof match.regularMarketPrice === "number") {
+            return { ...a, currentPrice: match.regularMarketPrice, isManualPrice: false };
+          }
+          return a;
+        })
+      );
     } catch {
-      throw new Error("Erro ao buscar cotação");
+      throw new Error("Erro ao buscar cotações");
     }
-  }, []);
+  }, [assets]);
 
   const totals = {
     totalCurrent: calculatedAssets.reduce((s, a) => s + a.totalCurrent, 0),
@@ -76,5 +80,5 @@ export function usePortfolio() {
     totalVariation: calculatedAssets.reduce((s, a) => s + a.totalVariationPerShare, 0),
   };
 
-  return { assets, calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchPrice, totals };
+  return { assets, calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchAllPrices, totals };
 }
