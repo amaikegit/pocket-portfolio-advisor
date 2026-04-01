@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trash2, Pencil, Check, X, RefreshCw, Loader2 } from "lucide-react";
+import { Trash2, Pencil, Check, X } from "lucide-react";
 import { Asset, AssetCalculated } from "@/types/portfolio";
 import { StarRating } from "@/components/StarRating";
 import {
