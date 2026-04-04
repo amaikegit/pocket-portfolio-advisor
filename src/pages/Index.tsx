@@ -4,6 +4,7 @@ import { AddAssetDialog } from "@/components/AddAssetDialog";
 import { CSVImportDialog } from "@/components/CSVImportDialog";
 import { PortfolioTable } from "@/components/PortfolioTable";
 import { SummaryCards } from "@/components/SummaryCards";
+import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { BarChart3, RefreshCw, Loader2 } from "lucide-react";
