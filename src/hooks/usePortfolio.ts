@@ -99,5 +99,5 @@ export function usePortfolio() {
     totalVariation: calculatedAssets.reduce((s, a) => s + a.totalVariationPerShare, 0),
   };
 
-  return { assets, calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchAllPrices, totals };
+  return { assets, calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchAllPrices, fetchProgress, totals };
 }
