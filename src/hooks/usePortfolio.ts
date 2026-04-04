@@ -50,27 +50,46 @@ export function usePortfolio() {
     return newAssets.length;
   }, []);
 
+  const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0, status: "" });
+
   const fetchAllPrices = useCallback(async () => {
-    const tickers = assets.map((a) => a.ticker).join(",");
-    if (!tickers) return;
-    try {
-      const res = await fetch(
-        `https://brapi.dev/api/quote/${encodeURIComponent(tickers)}?token=demo`
-      );
-      const data = await res.json();
-      const results: { symbol: string; regularMarketPrice: number }[] = data?.results || [];
-      setAssets((prev) =>
-        prev.map((a) => {
-          const match = results.find((r) => r.symbol === a.ticker);
-          if (match && typeof match.regularMarketPrice === "number") {
-            return { ...a, currentPrice: match.regularMarketPrice, isManualPrice: false };
-          }
-          return a;
-        })
-      );
-    } catch {
-      throw new Error("Erro ao buscar cotações");
+    const total = assets.length;
+    if (!total) return;
+    setFetchProgress({ current: 0, total, status: "Iniciando..." });
+    let completed = 0;
+    const errors: string[] = [];
+
+    for (const asset of assets) {
+      setFetchProgress({ current: completed, total, status: `Buscando ${asset.ticker}...` });
+      try {
+        const res = await fetch(
+          `https://brapi.dev/api/quote/${encodeURIComponent(asset.ticker)}`
+        );
+        const data = await res.json();
+        const price = data?.results?.[0]?.regularMarketPrice;
+        if (typeof price === "number") {
+          setAssets((prev) =>
+            prev.map((a) =>
+              a.id === asset.id ? { ...a, currentPrice: price, isManualPrice: false } : a
+            )
+          );
+        } else {
+          errors.push(asset.ticker);
+        }
+      } catch {
+        errors.push(asset.ticker);
+      }
+      completed++;
+      setFetchProgress({ current: completed, total, status: `${asset.ticker} concluído` });
     }
+
+    setFetchProgress({
+      current: total,
+      total,
+      status: errors.length ? `Concluído (falha: ${errors.join(", ")})` : "Concluído!",
+    });
+
+    setTimeout(() => setFetchProgress({ current: 0, total: 0, status: "" }), 3000);
   }, [assets]);
 
   const totals = {
@@ -80,5 +99,5 @@ export function usePortfolio() {
     totalVariation: calculatedAssets.reduce((s, a) => s + a.totalVariationPerShare, 0),
   };
 
-  return { assets, calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchAllPrices, totals };
+  return { assets, calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchAllPrices, fetchProgress, totals };
 }

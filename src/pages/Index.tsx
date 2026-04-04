@@ -4,11 +4,12 @@ import { AddAssetDialog } from "@/components/AddAssetDialog";
 import { CSVImportDialog } from "@/components/CSVImportDialog";
 import { PortfolioTable } from "@/components/PortfolioTable";
 import { SummaryCards } from "@/components/SummaryCards";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { BarChart3, RefreshCw, Loader2 } from "lucide-react";
 
 const Index = () => {
-  const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchAllPrices, totals } = usePortfolio();
+  const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchAllPrices, fetchProgress, totals } = usePortfolio();
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefreshAll = async () => {
@@ -16,6 +17,8 @@ const Index = () => {
     try { await fetchAllPrices(); } catch {}
     setRefreshing(false);
   };
+
+  const progressPct = fetchProgress.total > 0 ? (fetchProgress.current / fetchProgress.total) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -39,6 +42,16 @@ const Index = () => {
             <AddAssetDialog onAdd={addAsset} />
           </div>
         </div>
+        {/* Progress bar */}
+        {fetchProgress.total > 0 && (
+          <div className="container mx-auto px-4 pb-3 space-y-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{fetchProgress.status}</span>
+              <span>{fetchProgress.current}/{fetchProgress.total}</span>
+            </div>
+            <Progress value={progressPct} className="h-2" />
+          </div>
+        )}
       </header>
 
       {/* Content */}
