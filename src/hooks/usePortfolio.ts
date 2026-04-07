@@ -55,39 +55,44 @@ export function usePortfolio() {
   const fetchAllPrices = useCallback(async () => {
     const total = assets.length;
     if (!total) return;
-    setFetchProgress({ current: 0, total, status: "Iniciando..." });
-    let completed = 0;
-    const errors: string[] = [];
+    setFetchProgress({ current: 0, total, status: "Buscando cotações..." });
 
-    for (const asset of assets) {
-      setFetchProgress({ current: completed, total, status: `Buscando ${asset.ticker}...` });
-      try {
-        const res = await fetch(
-          `https://brapi.dev/api/quote/${encodeURIComponent(asset.ticker)}`
-        );
-        const data = await res.json();
-        const price = data?.results?.[0]?.regularMarketPrice;
-        if (typeof price === "number") {
-          setAssets((prev) =>
-            prev.map((a) =>
-              a.id === asset.id ? { ...a, currentPrice: price, isManualPrice: false } : a
-            )
-          );
-        } else {
-          errors.push(asset.ticker);
+    try {
+      const tickers = assets.map((a) => a.ticker);
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-quotes`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ tickers }),
         }
-      } catch {
-        errors.push(asset.ticker);
-      }
-      completed++;
-      setFetchProgress({ current: completed, total, status: `${asset.ticker} concluído` });
-    }
+      );
+      const data = await res.json();
+      const results: Record<string, number | null> = data?.results || {};
+      const errors: string[] = [];
 
-    setFetchProgress({
-      current: total,
-      total,
-      status: errors.length ? `Concluído (falha: ${errors.join(", ")})` : "Concluído!",
-    });
+      setAssets((prev) =>
+        prev.map((a) => {
+          const price = results[a.ticker];
+          if (typeof price === "number") {
+            return { ...a, currentPrice: price, isManualPrice: false };
+          }
+          errors.push(a.ticker);
+          return a;
+        })
+      );
+
+      setFetchProgress({
+        current: total,
+        total,
+        status: errors.length ? `Concluído (falha: ${errors.join(", ")})` : "Concluído!",
+      });
+    } catch {
+      setFetchProgress({ current: 0, total, status: "Erro ao buscar cotações" });
+    }
 
     setTimeout(() => setFetchProgress({ current: 0, total: 0, status: "" }), 3000);
   }, [assets]);
