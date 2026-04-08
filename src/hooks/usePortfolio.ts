@@ -214,5 +214,9 @@ export function usePortfolio() {
     totalVariation: calculatedAssets.reduce((s, a) => s + a.totalVariationPerShare, 0),
   };
 
-  return { assets, calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, transactions, fetchAllPrices, fetchProgress, totals };
+  const removeTransaction = useCallback((id: string) => {
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  return { assets, calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, removeTransaction, transactions, fetchAllPrices, fetchProgress, totals };
 }
