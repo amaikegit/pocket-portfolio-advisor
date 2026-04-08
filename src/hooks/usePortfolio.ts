@@ -218,6 +218,7 @@ export function usePortfolio() {
     totalInvested: calculatedAssets.reduce((s, a) => s + a.totalInvested, 0),
     totalDifference: calculatedAssets.reduce((s, a) => s + a.difference, 0),
     totalVariation: calculatedAssets.reduce((s, a) => s + a.totalVariationPerShare, 0),
+    totalMonthlyDY: assets.reduce((s, a) => s + (a.dividendYield * a.quantity), 0),
   };
 
   const removeTransaction = useCallback((id: string) => {
