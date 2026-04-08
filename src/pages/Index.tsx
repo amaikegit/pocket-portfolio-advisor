@@ -10,8 +10,11 @@ import { PortfolioCharts } from "@/components/PortfolioCharts";
 import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { BarChart3, RefreshCw, Loader2, FileText, LogOut } from "lucide-react";
+import { BarChart3, RefreshCw, Loader2, FileText, LogOut, Menu } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  Sheet, SheetContent, SheetTrigger,
+} from "@/components/ui/sheet";
 
 const Index = () => {
   const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, transactions, assets, fetchAllPrices, fetchProgress, totals } = usePortfolio();
@@ -31,16 +34,18 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-md bg-primary/20 flex items-center justify-center">
-              <BarChart3 className="h-4 w-4 text-primary" />
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-md bg-primary/20 flex items-center justify-center">
+              <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
             </div>
-            <h1 className="font-mono-display text-lg font-bold tracking-tight">
+            <h1 className="font-mono-display text-base sm:text-lg font-bold tracking-tight">
               Portfolio<span className="text-primary">Tracker</span>
             </h1>
           </div>
-          <div className="flex gap-2">
+
+          {/* Desktop buttons */}
+          <div className="hidden md:flex gap-2">
             <AIAnalysisPanel assets={calculatedAssets} />
             <Button variant="outline" className="gap-2" onClick={handleRefreshAll} disabled={refreshing}>
               {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -57,10 +62,41 @@ const Index = () => {
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
+
+          {/* Mobile buttons */}
+          <div className="flex md:hidden items-center gap-1.5">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleRefreshAll} disabled={refreshing}>
+              {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            </Button>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon" className="h-8 w-8">
+                  <Menu className="h-4 w-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-72 p-4 space-y-3">
+                <h2 className="font-mono-display font-bold text-sm mb-4">Menu</h2>
+                <div className="flex flex-col gap-2">
+                  <AIAnalysisPanel assets={calculatedAssets} />
+                  <CSVImportDialog onImport={importCSV} />
+                  <AddTransactionDialog onAdd={addTransaction} existingTickers={assets.map(a => a.ticker)} />
+                  <AddAssetDialog onAdd={addAsset} />
+                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate("/lancamentos")}>
+                    <FileText className="h-4 w-4" />
+                    Lançamentos
+                  </Button>
+                  <Button variant="ghost" className="w-full justify-start gap-2 text-destructive" onClick={signOut}>
+                    <LogOut className="h-4 w-4" />
+                    Sair
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
         {/* Progress bar */}
         {fetchProgress.total > 0 && (
-          <div className="container mx-auto px-4 pb-3 space-y-1">
+          <div className="container mx-auto px-3 sm:px-4 pb-3 space-y-1">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>{fetchProgress.status}</span>
               <span>{fetchProgress.current}/{fetchProgress.total}</span>
@@ -71,7 +107,7 @@ const Index = () => {
       </header>
 
       {/* Content */}
-      <main className="container mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
         <SummaryCards totals={totals} />
         <PortfolioCharts assets={calculatedAssets} />
         <PortfolioTable assets={calculatedAssets} onRemove={removeAsset} onUpdate={updateAsset} />

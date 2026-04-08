@@ -246,8 +246,8 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
           </Button>
         </div>
       )}
-      <div className="rounded-lg border border-border">
-        <Table className="table-fixed w-full">
+      <div className="rounded-lg border border-border overflow-x-auto">
+        <Table className="min-w-[900px] w-full">
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
               {columns.map((col) => (

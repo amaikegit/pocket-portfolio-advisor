@@ -103,7 +103,7 @@ export function TransactionHistory({ transactions, onRemove }: Props) {
         <p className="text-xs text-muted-foreground">{transactions.length} lançamento(s)</p>
       </div>
       <div className="overflow-x-auto">
-        <Table className="table-fixed w-full">
+        <Table className="min-w-[700px] w-full">
           <TableHeader>
             <TableRow className="bg-muted/30">
               {columns.map((col) => (
