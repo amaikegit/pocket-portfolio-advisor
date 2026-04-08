@@ -4,6 +4,7 @@ import { AddAssetDialog } from "@/components/AddAssetDialog";
 import { CSVImportDialog } from "@/components/CSVImportDialog";
 import { PortfolioTable } from "@/components/PortfolioTable";
 import { SummaryCards } from "@/components/SummaryCards";
+import { PortfolioCharts } from "@/components/PortfolioCharts";
 import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ const Index = () => {
       {/* Content */}
       <main className="container mx-auto px-4 py-6 space-y-6">
         <SummaryCards totals={totals} />
+        <PortfolioCharts assets={calculatedAssets} />
         <PortfolioTable assets={calculatedAssets} onRemove={removeAsset} onUpdate={updateAsset} />
       </main>
     </div>
