@@ -60,6 +60,7 @@ const Index = () => {
       {/* Content */}
       <main className="container mx-auto px-4 py-6 space-y-6">
         <SummaryCards totals={totals} />
+        <PortfolioCharts assets={calculatedAssets} />
         <PortfolioTable assets={calculatedAssets} onRemove={removeAsset} onUpdate={updateAsset} />
       </main>
     </div>
