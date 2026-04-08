@@ -19,3 +19,18 @@ export interface AssetCalculated extends Asset {
   portfolioProportion: number;
   totalVariationPerShare: number;
 }
+
+export type TransactionType = "buy" | "sell";
+export type AssetType = "acoes" | "fiis" | "bdrs" | "etfs" | "cripto";
+
+export interface Transaction {
+  id: string;
+  type: TransactionType;
+  assetType: AssetType;
+  ticker: string;
+  date: string;
+  quantity: number;
+  price: number;
+  otherCosts: number;
+  total: number;
+}
