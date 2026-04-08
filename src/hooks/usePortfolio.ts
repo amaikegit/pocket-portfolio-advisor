@@ -182,7 +182,7 @@ export function usePortfolio() {
         }
       );
       const data = await res.json();
-      const results: Record<string, { price: number | null; forwardDividendYield: number | null }> = data?.results || {};
+      const results: Record<string, { price: number | null; dividendYield: number | null }> = data?.results || {};
       const errors: string[] = [];
 
       setBaseAssets((prev) =>
@@ -190,9 +190,9 @@ export function usePortfolio() {
           const quote = results[a.ticker];
           if (quote && typeof quote.price === "number") {
             const updates: Partial<Asset> = { currentPrice: quote.price, isManualPrice: false };
-            // Forward Dividend Yield anual dividido por 12 = DY mensal estimado
-            if (typeof quote.forwardDividendYield === "number") {
-              updates.dividendYield = Math.round((quote.forwardDividendYield / 12) * 100) / 100;
+            // DY mensal estimado (já calculado na edge function: anual / 12)
+            if (typeof quote.dividendYield === "number") {
+              updates.dividendYield = quote.dividendYield;
             }
             return { ...a, ...updates };
           }
