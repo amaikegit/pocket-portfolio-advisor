@@ -7,108 +7,78 @@ const corsHeaders = {
 
 interface QuoteResult {
   price: number | null;
-  forwardDividendYield: number | null; // annual forward dividend yield (absolute R$)
+  dividendYield: number | null; // monthly estimated DY in R$
 }
 
-async function fetchFromBrapi(ticker: string): Promise<QuoteResult> {
+async function fetchFromBrapi(ticker: string): Promise<number | null> {
   try {
     const res = await fetch(
       `https://brapi.dev/api/quote/${encodeURIComponent(ticker)}?range=1d&interval=1d`
     );
     const data = await res.json();
-    const r = data?.results?.[0];
-    const price = typeof r?.regularMarketPrice === "number" ? r.regularMarketPrice : null;
-    // brapi doesn't reliably return forward dividend, so return null
-    return { price, forwardDividendYield: null };
+    const price = data?.results?.[0]?.regularMarketPrice;
+    return typeof price === "number" ? price : null;
   } catch {
-    return { price: null, forwardDividendYield: null };
+    return null;
   }
 }
 
-async function fetchFromYahooV6(ticker: string): Promise<QuoteResult> {
+async function fetchFromYahooChart(ticker: string): Promise<{ price: number | null; lastDividend: number | null }> {
   try {
     const symbol = ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
+    // Fetch 1 year of data with dividend events
     const res = await fetch(
-      `https://query2.finance.yahoo.com/v6/finance/quote?symbols=${encodeURIComponent(symbol)}`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1mo&range=1y&events=div`,
       { headers: { "User-Agent": "Mozilla/5.0" } }
     );
     const data = await res.json();
-    const r = data?.quoteResponse?.result?.[0];
-    const price = typeof r?.regularMarketPrice === "number" ? r.regularMarketPrice : null;
-    const fdy = typeof r?.trailingAnnualDividendRate === "number" ? r.trailingAnnualDividendRate : null;
-    return { price, forwardDividendYield: fdy };
-  } catch {
-    return { price: null, forwardDividendYield: null };
-  }
-}
+    const result = data?.chart?.result?.[0];
+    const price = result?.meta?.regularMarketPrice;
+    
+    // Extract dividend events
+    const divEvents = result?.events?.dividends;
+    let lastDividend: number | null = null;
+    
+    if (divEvents && typeof divEvents === "object") {
+      // divEvents is an object keyed by timestamp
+      const dividends = Object.values(divEvents) as Array<{ amount: number; date: number }>;
+      if (dividends.length > 0) {
+        // Sort by date descending, get last dividend amount
+        dividends.sort((a: any, b: any) => (b.date || 0) - (a.date || 0));
+        const lastAmount = dividends[0]?.amount;
+        if (typeof lastAmount === "number" && lastAmount > 0) {
+          lastDividend = lastAmount;
+        }
+      }
+    }
 
-async function fetchFromYahooChart(ticker: string): Promise<QuoteResult> {
-  try {
-    const symbol = ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
-    const res = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
-      { headers: { "User-Agent": "Mozilla/5.0" } }
-    );
-    const data = await res.json();
-    const meta = data?.chart?.result?.[0]?.meta;
-    const price = typeof meta?.regularMarketPrice === "number" ? meta.regularMarketPrice : null;
-    return { price, forwardDividendYield: null };
-  } catch {
-    return { price: null, forwardDividendYield: null };
-  }
-}
+    console.log(`Yahoo chart ${symbol}: price=${price}, dividends found=${divEvents ? Object.keys(divEvents).length : 0}, lastDiv=${lastDividend}`);
 
-async function fetchFromYahooScrape(ticker: string): Promise<QuoteResult> {
-  try {
-    const symbol = ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
-    const res = await fetch(
-      `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/`,
-      { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" } }
-    );
-    const html = await res.text();
-
-    // Extract price
-    let price: number | null = null;
-    const priceMatch = html.match(/"regularMarketPrice":\{"raw":([\d.]+)/);
-    if (priceMatch) price = parseFloat(priceMatch[1]);
-
-    // Extract trailing annual dividend rate
-    let fdy: number | null = null;
-    const divMatch = html.match(/"trailingAnnualDividendRate":\{"raw":([\d.]+)/);
-    if (divMatch) fdy = parseFloat(divMatch[1]);
-
-    return { price, forwardDividendYield: fdy };
-  } catch {
-    return { price: null, forwardDividendYield: null };
+    return {
+      price: typeof price === "number" ? price : null,
+      lastDividend,
+    };
+  } catch (e) {
+    console.log(`Yahoo chart error for ${ticker}: ${e.message}`);
+    return { price: null, lastDividend: null };
   }
 }
 
 async function fetchQuote(ticker: string): Promise<QuoteResult> {
-  // Try brapi first
-  let result = await fetchFromBrapi(ticker);
-  if (result.price !== null && result.forwardDividendYield !== null) return result;
+  // Try brapi for price
+  let price = await fetchFromBrapi(ticker);
+  
+  // Try Yahoo chart for price + dividends
+  const yahoo = await fetchFromYahooChart(ticker);
+  if (price === null) price = yahoo.price;
 
-  // Keep partial results
-  let bestPrice = result.price;
-  let bestDY = result.forwardDividendYield;
+  // lastDividend is the most recent monthly dividend payment
+  // Use it directly as the estimated monthly DY
+  const monthlyDY = yahoo.lastDividend !== null
+    ? Math.round(yahoo.lastDividend * 100) / 100
+    : null;
 
-  // Yahoo v6
-  result = await fetchFromYahooV6(ticker);
-  if (result.price !== null) bestPrice = result.price;
-  if (result.forwardDividendYield !== null) bestDY = result.forwardDividendYield;
-  if (bestPrice !== null && bestDY !== null) return { price: bestPrice, forwardDividendYield: bestDY };
-
-  // Yahoo chart (price only)
-  result = await fetchFromYahooChart(ticker);
-  if (result.price !== null) bestPrice = result.price;
-  if (bestPrice !== null && bestDY !== null) return { price: bestPrice, forwardDividendYield: bestDY };
-
-  // Yahoo scrape as last resort
-  result = await fetchFromYahooScrape(ticker);
-  if (result.price !== null) bestPrice = result.price;
-  if (result.forwardDividendYield !== null) bestDY = result.forwardDividendYield;
-
-  return { price: bestPrice, forwardDividendYield: bestDY };
+  return { price, dividendYield: monthlyDY };
 }
 
 serve(async (req) => {
@@ -137,7 +107,7 @@ serve(async (req) => {
       results[ticker] = quote;
     }
 
-    console.log("Fetch results:", JSON.stringify(results));
+    console.log("Results:", JSON.stringify(results));
 
     return new Response(JSON.stringify({ results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
