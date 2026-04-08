@@ -28,7 +28,7 @@ export function SummaryCards({ totals }: SummaryCardsProps) {
   const variationColor = variationPct >= 0 ? "text-positive" : "text-negative";
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
       {/* Patrimônio Total */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-1">
         <div className="flex items-center gap-2 text-muted-foreground">
@@ -36,7 +36,7 @@ export function SummaryCards({ totals }: SummaryCardsProps) {
           <span className="text-xs font-medium uppercase tracking-wider">Patrimônio total</span>
         </div>
         <div className="flex items-baseline gap-2">
-          <p className="font-mono-display text-xl font-bold">{fmt(totals.totalCurrent)}</p>
+          <p className="font-mono-display text-lg sm:text-xl font-bold">{fmt(totals.totalCurrent)}</p>
           <span className={`text-xs font-medium ${variationColor}`}>
             {variationPct >= 0 ? "▲" : "▼"} {pct(Math.abs(variationPct))}
           </span>
