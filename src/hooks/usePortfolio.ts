@@ -60,8 +60,9 @@ function applyTransactions(assets: Asset[], transactions: Transaction[]): Asset[
 }
 
 function recalcFromTx(asset: Asset, txs: Transaction[]): Asset {
-  let qty = 0;
-  let totalCost = 0;
+  // Start from the base asset's existing values
+  let qty = asset.quantity;
+  let totalCost = asset.totalInvested;
 
   // Sort by date
   const sorted = [...txs].sort((a, b) => a.date.localeCompare(b.date));
