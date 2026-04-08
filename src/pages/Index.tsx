@@ -10,12 +10,14 @@ import { PortfolioCharts } from "@/components/PortfolioCharts";
 import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { BarChart3, RefreshCw, Loader2, FileText } from "lucide-react";
+import { BarChart3, RefreshCw, Loader2, FileText, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, transactions, assets, fetchAllPrices, fetchProgress, totals } = usePortfolio();
   const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
+  const { signOut } = useAuth();
 
   const handleRefreshAll = async () => {
     setRefreshing(true);
@@ -50,6 +52,9 @@ const Index = () => {
             <Button variant="outline" className="gap-2" onClick={() => navigate("/lancamentos")}>
               <FileText className="h-4 w-4" />
               Lançamentos
+            </Button>
+            <Button variant="ghost" size="icon" onClick={signOut} title="Sair">
+              <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>

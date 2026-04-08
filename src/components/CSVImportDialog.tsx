@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 
 interface CSVImportDialogProps {
-  onImport: (csv: string) => number;
+  onImport: (csv: string) => number | Promise<number>;
 }
 
 export function CSVImportDialog({ onImport }: CSVImportDialogProps) {
