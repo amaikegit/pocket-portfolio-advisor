@@ -10,77 +10,75 @@ interface QuoteResult {
   dividendYield: number | null; // monthly estimated DY in R$
 }
 
-async function fetchFromBrapi(ticker: string): Promise<{ price: number | null; annualDY: number | null; rawFields: Record<string, unknown> }> {
+async function fetchFromBrapi(ticker: string): Promise<number | null> {
   try {
     const res = await fetch(
       `https://brapi.dev/api/quote/${encodeURIComponent(ticker)}?range=1d&interval=1d`
     );
     const data = await res.json();
-    const r = data?.results?.[0];
-    if (!r) return { price: null, annualDY: null, rawFields: {} };
-
-    const price = typeof r.regularMarketPrice === "number" ? r.regularMarketPrice : null;
-    
-    // brapi can return these fields:
-    // dividendYield (percentage), trailingAnnualDividendRate (absolute R$), trailingAnnualDividendYield (percentage)
-    let annualDY: number | null = null;
-    
-    if (typeof r.trailingAnnualDividendRate === "number" && r.trailingAnnualDividendRate > 0) {
-      annualDY = r.trailingAnnualDividendRate;
-    } else if (typeof r.dividendsData?.cashDividends?.[0]?.rate === "number") {
-      // Use last dividend as monthly estimate
-      annualDY = r.dividendsData.cashDividends[0].rate * 12;
-    }
-
-    // Log relevant fields for debugging
-    const rawFields: Record<string, unknown> = {};
-    for (const key of Object.keys(r)) {
-      if (key.toLowerCase().includes("dividend") || key.toLowerCase().includes("yield")) {
-        rawFields[key] = r[key];
-      }
-    }
-
-    return { price, annualDY, rawFields };
-  } catch {
-    return { price: null, annualDY: null, rawFields: {} };
-  }
-}
-
-async function fetchFromYahooChart(ticker: string): Promise<number | null> {
-  try {
-    const symbol = ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
-    const res = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
-      { headers: { "User-Agent": "Mozilla/5.0" } }
-    );
-    const data = await res.json();
-    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+    const price = data?.results?.[0]?.regularMarketPrice;
     return typeof price === "number" ? price : null;
   } catch {
     return null;
   }
 }
 
-async function fetchQuote(ticker: string): Promise<QuoteResult & { debug: Record<string, unknown> }> {
-  // Try brapi first (has both price and dividend data)
-  const brapi = await fetchFromBrapi(ticker);
-  
-  let price = brapi.price;
-  let annualDY = brapi.annualDY;
+async function fetchFromYahooChart(ticker: string): Promise<{ price: number | null; lastDividend: number | null }> {
+  try {
+    const symbol = ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
+    // Fetch 1 year of data with dividend events
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1mo&range=1y&events=div`,
+      { headers: { "User-Agent": "Mozilla/5.0" } }
+    );
+    const data = await res.json();
+    const result = data?.chart?.result?.[0];
+    const price = result?.meta?.regularMarketPrice;
+    
+    // Extract dividend events
+    const divEvents = result?.events?.dividends;
+    let lastDividend: number | null = null;
+    
+    if (divEvents && typeof divEvents === "object") {
+      // divEvents is an object keyed by timestamp
+      const dividends = Object.values(divEvents) as Array<{ amount: number; date: number }>;
+      if (dividends.length > 0) {
+        // Sort by date descending, get last dividend amount
+        dividends.sort((a: any, b: any) => (b.date || 0) - (a.date || 0));
+        const lastAmount = dividends[0]?.amount;
+        if (typeof lastAmount === "number" && lastAmount > 0) {
+          lastDividend = lastAmount;
+        }
+      }
+    }
 
-  // Fallback for price: Yahoo chart
-  if (price === null) {
-    price = await fetchFromYahooChart(ticker);
+    console.log(`Yahoo chart ${symbol}: price=${price}, dividends found=${divEvents ? Object.keys(divEvents).length : 0}, lastDiv=${lastDividend}`);
+
+    return {
+      price: typeof price === "number" ? price : null,
+      lastDividend,
+    };
+  } catch (e) {
+    console.log(`Yahoo chart error for ${ticker}: ${e.message}`);
+    return { price: null, lastDividend: null };
   }
+}
 
-  // Monthly DY = annual / 12
-  const monthlyDY = annualDY !== null ? Math.round((annualDY / 12) * 100) / 100 : null;
+async function fetchQuote(ticker: string): Promise<QuoteResult> {
+  // Try brapi for price
+  let price = await fetchFromBrapi(ticker);
+  
+  // Try Yahoo chart for price + dividends
+  const yahoo = await fetchFromYahooChart(ticker);
+  if (price === null) price = yahoo.price;
 
-  return {
-    price,
-    dividendYield: monthlyDY,
-    debug: brapi.rawFields,
-  };
+  // lastDividend is the most recent monthly dividend payment
+  // Use it directly as the estimated monthly DY
+  const monthlyDY = yahoo.lastDividend !== null
+    ? Math.round(yahoo.lastDividend * 100) / 100
+    : null;
+
+  return { price, dividendYield: monthlyDY };
 }
 
 serve(async (req) => {
@@ -105,18 +103,11 @@ serve(async (req) => {
     );
 
     const results: Record<string, QuoteResult> = {};
-    const debugInfo: Record<string, unknown> = {};
     for (const [ticker, quote] of entries) {
-      results[ticker] = { price: quote.price, dividendYield: quote.dividendYield };
-      if (Object.keys(quote.debug).length > 0) {
-        debugInfo[ticker] = quote.debug;
-      }
+      results[ticker] = quote;
     }
 
     console.log("Results:", JSON.stringify(results));
-    if (Object.keys(debugInfo).length > 0) {
-      console.log("DY debug fields:", JSON.stringify(debugInfo));
-    }
 
     return new Response(JSON.stringify({ results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
