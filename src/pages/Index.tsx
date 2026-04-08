@@ -10,7 +10,8 @@ import { PortfolioCharts } from "@/components/PortfolioCharts";
 import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { BarChart3, RefreshCw, Loader2, FileText } from "lucide-react";
+import { BarChart3, RefreshCw, Loader2, FileText, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, transactions, assets, fetchAllPrices, fetchProgress, totals } = usePortfolio();
