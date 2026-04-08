@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { AddAssetDialog } from "@/components/AddAssetDialog";
+import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { CSVImportDialog } from "@/components/CSVImportDialog";
 import { PortfolioTable } from "@/components/PortfolioTable";
 import { SummaryCards } from "@/components/SummaryCards";
@@ -11,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { BarChart3, RefreshCw, Loader2 } from "lucide-react";
 
 const Index = () => {
-  const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchAllPrices, fetchProgress, totals } = usePortfolio();
+  const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, assets, fetchAllPrices, fetchProgress, totals } = usePortfolio();
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefreshAll = async () => {
@@ -42,6 +43,7 @@ const Index = () => {
               Atualizar Cotações
             </Button>
             <CSVImportDialog onImport={importCSV} />
+            <AddTransactionDialog onAdd={addTransaction} existingTickers={assets.map(a => a.ticker)} />
             <AddAssetDialog onAdd={addAsset} />
           </div>
         </div>
