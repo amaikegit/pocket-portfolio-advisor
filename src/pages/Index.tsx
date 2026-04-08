@@ -43,6 +43,7 @@ const Index = () => {
               Atualizar Cotações
             </Button>
             <CSVImportDialog onImport={importCSV} />
+            <AddTransactionDialog onAdd={addTransaction} existingTickers={assets.map(a => a.ticker)} />
             <AddAssetDialog onAdd={addAsset} />
           </div>
         </div>
