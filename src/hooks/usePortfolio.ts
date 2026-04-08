@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from "react";
-import { Asset, AssetCalculated } from "@/types/portfolio";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { Asset, AssetCalculated, Transaction } from "@/types/portfolio";
 import { calculateAsset, parseCSV } from "@/lib/portfolio";
 
 const STORAGE_KEY = "portfolio-assets";
+const TX_STORAGE_KEY = "portfolio-transactions";
 
 function loadAssets(): Asset[] {
   try {
@@ -13,12 +14,97 @@ function loadAssets(): Asset[] {
   }
 }
 
+function loadTransactions(): Transaction[] {
+  try {
+    const raw = localStorage.getItem(TX_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Recalculate an asset's quantity, averagePrice, totalInvested from transactions */
+function applyTransactions(assets: Asset[], transactions: Transaction[]): Asset[] {
+  // Group transactions by ticker
+  const txByTicker: Record<string, Transaction[]> = {};
+  for (const tx of transactions) {
+    if (!txByTicker[tx.ticker]) txByTicker[tx.ticker] = [];
+    txByTicker[tx.ticker].push(tx);
+  }
+
+  // Update existing assets
+  const updatedAssets = assets.map((a) => {
+    const txs = txByTicker[a.ticker];
+    if (!txs) return a;
+    delete txByTicker[a.ticker];
+    return recalcFromTx(a, txs);
+  });
+
+  // Create new assets from tickers not yet in portfolio
+  for (const [ticker, txs] of Object.entries(txByTicker)) {
+    const base: Asset = {
+      id: crypto.randomUUID(),
+      ticker,
+      quantity: 0,
+      currentPrice: 0,
+      isManualPrice: true,
+      averagePrice: 0,
+      totalInvested: 0,
+      dividendYield: 0,
+      pvp: 0,
+    };
+    updatedAssets.push(recalcFromTx(base, txs));
+  }
+
+  return updatedAssets;
+}
+
+function recalcFromTx(asset: Asset, txs: Transaction[]): Asset {
+  let qty = 0;
+  let totalCost = 0;
+
+  // Sort by date
+  const sorted = [...txs].sort((a, b) => a.date.localeCompare(b.date));
+
+  for (const tx of sorted) {
+    if (tx.type === "buy") {
+      totalCost += tx.quantity * tx.price + tx.otherCosts;
+      qty += tx.quantity;
+    } else {
+      // sell
+      if (qty > 0) {
+        const avgBefore = totalCost / qty;
+        qty -= tx.quantity;
+        if (qty < 0) qty = 0;
+        totalCost = qty * avgBefore;
+      }
+    }
+  }
+
+  const avgPrice = qty > 0 ? totalCost / qty : 0;
+
+  return {
+    ...asset,
+    quantity: qty,
+    averagePrice: Math.round(avgPrice * 100) / 100,
+    totalInvested: Math.round(totalCost * 100) / 100,
+  };
+}
+
 export function usePortfolio() {
-  const [assets, setAssets] = useState<Asset[]>(loadAssets);
+  const [baseAssets, setBaseAssets] = useState<Asset[]>(loadAssets);
+  const [transactions, setTransactions] = useState<Transaction[]>(loadTransactions);
+
+  // Merge base assets with transaction data
+  const assets = useMemo(() => applyTransactions(baseAssets, transactions), [baseAssets, transactions]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(assets));
-  }, [assets]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(baseAssets));
+  }, [baseAssets]);
+
+  useEffect(() => {
+    localStorage.setItem(TX_STORAGE_KEY, JSON.stringify(transactions));
+  }, [transactions]);
 
   const totalPortfolio = assets.reduce((sum, a) => sum + a.quantity * a.currentPrice, 0);
 
@@ -27,17 +113,17 @@ export function usePortfolio() {
   );
 
   const addAsset = useCallback((asset: Omit<Asset, "id">) => {
-    setAssets((prev) => [...prev, { ...asset, id: crypto.randomUUID() }]);
+    setBaseAssets((prev) => [...prev, { ...asset, id: crypto.randomUUID() }]);
   }, []);
 
   const updateAsset = useCallback((id: string, updates: Partial<Omit<Asset, "id">>) => {
-    setAssets((prev) =>
+    setBaseAssets((prev) =>
       prev.map((a) => (a.id === id ? { ...a, ...updates } : a))
     );
   }, []);
 
   const removeAsset = useCallback((id: string) => {
-    setAssets((prev) => prev.filter((a) => a.id !== id));
+    setBaseAssets((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
   const importCSV = useCallback((csvText: string) => {
@@ -46,8 +132,32 @@ export function usePortfolio() {
       ...a,
       id: crypto.randomUUID(),
     }));
-    setAssets((prev) => [...prev, ...newAssets]);
+    setBaseAssets((prev) => [...prev, ...newAssets]);
     return newAssets.length;
+  }, []);
+
+  const addTransaction = useCallback((tx: Omit<Transaction, "id">) => {
+    const newTx: Transaction = { ...tx, id: crypto.randomUUID() };
+    setTransactions((prev) => [...prev, newTx]);
+
+    // If ticker doesn't exist yet in base assets, create it
+    setBaseAssets((prev) => {
+      const exists = prev.some((a) => a.ticker === tx.ticker);
+      if (!exists) {
+        return [...prev, {
+          id: crypto.randomUUID(),
+          ticker: tx.ticker,
+          quantity: 0,
+          currentPrice: tx.price,
+          isManualPrice: true,
+          averagePrice: 0,
+          totalInvested: 0,
+          dividendYield: 0,
+          pvp: 0,
+        }];
+      }
+      return prev;
+    });
   }, []);
 
   const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0, status: "" });
@@ -74,7 +184,7 @@ export function usePortfolio() {
       const results: Record<string, number | null> = data?.results || {};
       const errors: string[] = [];
 
-      setAssets((prev) =>
+      setBaseAssets((prev) =>
         prev.map((a) => {
           const price = results[a.ticker];
           if (typeof price === "number") {
@@ -104,5 +214,5 @@ export function usePortfolio() {
     totalVariation: calculatedAssets.reduce((s, a) => s + a.totalVariationPerShare, 0),
   };
 
-  return { assets, calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, fetchAllPrices, fetchProgress, totals };
+  return { assets, calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, transactions, fetchAllPrices, fetchProgress, totals };
 }
