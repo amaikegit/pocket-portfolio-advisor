@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { AddAssetDialog } from "@/components/AddAssetDialog";
 import { AddTransactionDialog } from "@/components/AddTransactionDialog";
@@ -7,10 +8,9 @@ import { PortfolioTable } from "@/components/PortfolioTable";
 import { SummaryCards } from "@/components/SummaryCards";
 import { PortfolioCharts } from "@/components/PortfolioCharts";
 import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
-import { TransactionHistory } from "@/components/TransactionHistory";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { BarChart3, RefreshCw, Loader2 } from "lucide-react";
+import { BarChart3, RefreshCw, Loader2, FileText } from "lucide-react";
 
 const Index = () => {
   const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, removeTransaction, transactions, assets, fetchAllPrices, fetchProgress, totals } = usePortfolio();
