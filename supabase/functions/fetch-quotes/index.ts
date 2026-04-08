@@ -5,36 +5,44 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-async function fetchFromBrapi(ticker: string): Promise<number | null> {
+interface QuoteResult {
+  price: number | null;
+  forwardDividendYield: number | null; // annual forward dividend yield (absolute R$)
+}
+
+async function fetchFromBrapi(ticker: string): Promise<QuoteResult> {
   try {
     const res = await fetch(
       `https://brapi.dev/api/quote/${encodeURIComponent(ticker)}?range=1d&interval=1d`
     );
     const data = await res.json();
-    const price = data?.results?.[0]?.regularMarketPrice;
-    return typeof price === "number" ? price : null;
+    const r = data?.results?.[0];
+    const price = typeof r?.regularMarketPrice === "number" ? r.regularMarketPrice : null;
+    // brapi doesn't reliably return forward dividend, so return null
+    return { price, forwardDividendYield: null };
   } catch {
-    return null;
+    return { price: null, forwardDividendYield: null };
   }
 }
 
-async function fetchFromYahooV6(ticker: string): Promise<number | null> {
+async function fetchFromYahooV6(ticker: string): Promise<QuoteResult> {
   try {
-    // Try with .SA suffix for Brazilian stocks
     const symbol = ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
     const res = await fetch(
       `https://query2.finance.yahoo.com/v6/finance/quote?symbols=${encodeURIComponent(symbol)}`,
       { headers: { "User-Agent": "Mozilla/5.0" } }
     );
     const data = await res.json();
-    const price = data?.quoteResponse?.result?.[0]?.regularMarketPrice;
-    return typeof price === "number" ? price : null;
+    const r = data?.quoteResponse?.result?.[0];
+    const price = typeof r?.regularMarketPrice === "number" ? r.regularMarketPrice : null;
+    const fdy = typeof r?.trailingAnnualDividendRate === "number" ? r.trailingAnnualDividendRate : null;
+    return { price, forwardDividendYield: fdy };
   } catch {
-    return null;
+    return { price: null, forwardDividendYield: null };
   }
 }
 
-async function fetchFromYahooChart(ticker: string): Promise<number | null> {
+async function fetchFromYahooChart(ticker: string): Promise<QuoteResult> {
   try {
     const symbol = ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
     const res = await fetch(
@@ -42,27 +50,65 @@ async function fetchFromYahooChart(ticker: string): Promise<number | null> {
       { headers: { "User-Agent": "Mozilla/5.0" } }
     );
     const data = await res.json();
-    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-    return typeof price === "number" ? price : null;
+    const meta = data?.chart?.result?.[0]?.meta;
+    const price = typeof meta?.regularMarketPrice === "number" ? meta.regularMarketPrice : null;
+    return { price, forwardDividendYield: null };
   } catch {
-    return null;
+    return { price: null, forwardDividendYield: null };
   }
 }
 
-async function fetchPrice(ticker: string): Promise<number | null> {
-  // Try brapi first (no token = free tier with rate limits)
-  let price = await fetchFromBrapi(ticker);
-  if (price !== null) return price;
+async function fetchFromYahooScrape(ticker: string): Promise<QuoteResult> {
+  try {
+    const symbol = ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
+    const res = await fetch(
+      `https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/`,
+      { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" } }
+    );
+    const html = await res.text();
 
-  // Fallback: Yahoo v6
-  price = await fetchFromYahooV6(ticker);
-  if (price !== null) return price;
+    // Extract price
+    let price: number | null = null;
+    const priceMatch = html.match(/"regularMarketPrice":\{"raw":([\d.]+)/);
+    if (priceMatch) price = parseFloat(priceMatch[1]);
 
-  // Fallback: Yahoo chart
-  price = await fetchFromYahooChart(ticker);
-  if (price !== null) return price;
+    // Extract trailing annual dividend rate
+    let fdy: number | null = null;
+    const divMatch = html.match(/"trailingAnnualDividendRate":\{"raw":([\d.]+)/);
+    if (divMatch) fdy = parseFloat(divMatch[1]);
 
-  return null;
+    return { price, forwardDividendYield: fdy };
+  } catch {
+    return { price: null, forwardDividendYield: null };
+  }
+}
+
+async function fetchQuote(ticker: string): Promise<QuoteResult> {
+  // Try brapi first
+  let result = await fetchFromBrapi(ticker);
+  if (result.price !== null && result.forwardDividendYield !== null) return result;
+
+  // Keep partial results
+  let bestPrice = result.price;
+  let bestDY = result.forwardDividendYield;
+
+  // Yahoo v6
+  result = await fetchFromYahooV6(ticker);
+  if (result.price !== null) bestPrice = result.price;
+  if (result.forwardDividendYield !== null) bestDY = result.forwardDividendYield;
+  if (bestPrice !== null && bestDY !== null) return { price: bestPrice, forwardDividendYield: bestDY };
+
+  // Yahoo chart (price only)
+  result = await fetchFromYahooChart(ticker);
+  if (result.price !== null) bestPrice = result.price;
+  if (bestPrice !== null && bestDY !== null) return { price: bestPrice, forwardDividendYield: bestDY };
+
+  // Yahoo scrape as last resort
+  result = await fetchFromYahooScrape(ticker);
+  if (result.price !== null) bestPrice = result.price;
+  if (result.forwardDividendYield !== null) bestDY = result.forwardDividendYield;
+
+  return { price: bestPrice, forwardDividendYield: bestDY };
 }
 
 serve(async (req) => {
@@ -79,17 +125,16 @@ serve(async (req) => {
       });
     }
 
-    // Fetch all tickers concurrently
     const entries = await Promise.all(
       tickers.map(async (ticker: string) => {
-        const price = await fetchPrice(ticker);
-        return [ticker, price] as const;
+        const quote = await fetchQuote(ticker);
+        return [ticker, quote] as const;
       })
     );
 
-    const results: Record<string, number | null> = {};
-    for (const [ticker, price] of entries) {
-      results[ticker] = price;
+    const results: Record<string, QuoteResult> = {};
+    for (const [ticker, quote] of entries) {
+      results[ticker] = quote;
     }
 
     console.log("Fetch results:", JSON.stringify(results));
