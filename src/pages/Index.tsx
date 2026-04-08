@@ -17,6 +17,7 @@ const Index = () => {
   const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, transactions, assets, fetchAllPrices, fetchProgress, totals } = usePortfolio();
   const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
+  const { signOut } = useAuth();
 
   const handleRefreshAll = async () => {
     setRefreshing(true);
