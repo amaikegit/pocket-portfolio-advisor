@@ -14,7 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      assets: {
+        Row: {
+          average_price: number
+          created_at: string
+          current_price: number
+          dividend_yield: number
+          id: string
+          is_manual_price: boolean
+          pvp: number
+          quantity: number
+          ticker: string
+          total_invested: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          average_price?: number
+          created_at?: string
+          current_price?: number
+          dividend_yield?: number
+          id?: string
+          is_manual_price?: boolean
+          pvp?: number
+          quantity?: number
+          ticker: string
+          total_invested?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          average_price?: number
+          created_at?: string
+          current_price?: number
+          dividend_yield?: number
+          id?: string
+          is_manual_price?: boolean
+          pvp?: number
+          quantity?: number
+          ticker?: string
+          total_invested?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          asset_type: string
+          created_at: string
+          date: string
+          id: string
+          other_costs: number
+          price: number
+          quantity: number
+          ticker: string
+          total: number
+          type: string
+          user_id: string
+        }
+        Insert: {
+          asset_type: string
+          created_at?: string
+          date: string
+          id?: string
+          other_costs?: number
+          price: number
+          quantity: number
+          ticker: string
+          total?: number
+          type: string
+          user_id: string
+        }
+        Update: {
+          asset_type?: string
+          created_at?: string
+          date?: string
+          id?: string
+          other_costs?: number
+          price?: number
+          quantity?: number
+          ticker?: string
+          total?: number
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
