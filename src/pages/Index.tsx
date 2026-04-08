@@ -53,6 +53,9 @@ const Index = () => {
               <FileText className="h-4 w-4" />
               Lançamentos
             </Button>
+            <Button variant="ghost" size="icon" onClick={signOut} title="Sair">
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         </div>
         {/* Progress bar */}
