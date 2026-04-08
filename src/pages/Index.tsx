@@ -7,12 +7,13 @@ import { PortfolioTable } from "@/components/PortfolioTable";
 import { SummaryCards } from "@/components/SummaryCards";
 import { PortfolioCharts } from "@/components/PortfolioCharts";
 import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
+import { TransactionHistory } from "@/components/TransactionHistory";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { BarChart3, RefreshCw, Loader2 } from "lucide-react";
 
 const Index = () => {
-  const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, assets, fetchAllPrices, fetchProgress, totals } = usePortfolio();
+  const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, removeTransaction, transactions, assets, fetchAllPrices, fetchProgress, totals } = usePortfolio();
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefreshAll = async () => {
@@ -64,6 +65,7 @@ const Index = () => {
         <SummaryCards totals={totals} />
         <PortfolioCharts assets={calculatedAssets} />
         <PortfolioTable assets={calculatedAssets} onRemove={removeAsset} onUpdate={updateAsset} />
+        <TransactionHistory transactions={transactions} onRemove={removeTransaction} />
       </main>
     </div>
   );
