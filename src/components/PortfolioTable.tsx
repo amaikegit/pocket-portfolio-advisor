@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Trash2, Pencil, Check, X, ArrowUpDown, ArrowUp, ArrowDown, Filter } from "lucide-react";
+import { Check, X, ArrowUpDown, ArrowUp, ArrowDown, Filter, Pencil, Trash2 } from "lucide-react";
 import { Asset, AssetCalculated } from "@/types/portfolio";
 import { StarRating } from "@/components/StarRating";
 import {
@@ -35,25 +35,25 @@ interface ColumnDef {
 const columns: ColumnDef[] = [
   { key: "ticker", label: "Ticker", align: "left", accessor: (a) => a.ticker, filterable: true },
   { key: "quantity", label: "Cotas", align: "right", accessor: (a) => a.quantity },
-  { key: "currentPrice", label: "Valor Atual", align: "right", accessor: (a) => a.currentPrice },
-  { key: "totalCurrent", label: "Total Atual", align: "right", accessor: (a) => a.totalCurrent },
-  { key: "averagePrice", label: "Preço Médio", align: "right", accessor: (a) => a.averagePrice },
-  { key: "totalInvested", label: "Total Investido", align: "right", accessor: (a) => a.totalInvested },
-  { key: "difference", label: "Diferença", align: "right", accessor: (a) => a.difference },
-  { key: "dividendYield", label: "DY (R$)", align: "right", accessor: (a) => a.dividendYield },
+  { key: "currentPrice", label: "Atual", align: "right", accessor: (a) => a.currentPrice },
+  { key: "totalCurrent", label: "Total", align: "right", accessor: (a) => a.totalCurrent },
+  { key: "averagePrice", label: "PM", align: "right", accessor: (a) => a.averagePrice },
+  { key: "totalInvested", label: "Investido", align: "right", accessor: (a) => a.totalInvested },
+  { key: "difference", label: "Dif.", align: "right", accessor: (a) => a.difference },
+  { key: "dividendYield", label: "DY", align: "right", accessor: (a) => a.dividendYield },
   { key: "pvp", label: "P/VP", align: "right", accessor: (a) => a.pvp },
-  { key: "monthlyProfitability", label: "Rent. Mensal", align: "right", accessor: (a) => a.monthlyProfitability },
-  { key: "priceVariation", label: "Var. Cota", align: "right", accessor: (a) => a.priceVariation },
+  { key: "monthlyProfitability", label: "Rent.", align: "right", accessor: (a) => a.monthlyProfitability },
+  { key: "priceVariation", label: "Var.", align: "right", accessor: (a) => a.priceVariation },
   { key: "rating", label: "Rating", align: "center", accessor: (a) => a.rating },
-  { key: "portfolioProportion", label: "% Carteira", align: "right", accessor: (a) => a.portfolioProportion },
-  { key: "totalVariationPerShare", label: "Var. Total", align: "right", accessor: (a) => a.totalVariationPerShare },
+  { key: "portfolioProportion", label: "%Cart.", align: "right", accessor: (a) => a.portfolioProportion },
+  { key: "totalVariationPerShare", label: "Var.Tot.", align: "right", accessor: (a) => a.totalVariationPerShare },
 ];
 
 function ValueCell({ value, colored = false }: { value: number; colored?: boolean }) {
   const cls = colored
     ? value > 0 ? "text-positive" : value < 0 ? "text-negative" : ""
     : "";
-  return <span className={`font-mono-display text-sm ${cls}`}>{fmt(value)}</span>;
+  return <span className={`font-mono-display text-xs ${cls}`}>{fmt(value)}</span>;
 }
 
 function SortableHeader({
@@ -75,22 +75,22 @@ function SortableHeader({
   const hasFilter = filterValue.length > 0;
 
   return (
-    <TableHead className={`font-mono-display text-xs text-${col.align}`}>
-      <div className={`flex items-center gap-1 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
+    <TableHead className="font-mono-display text-[10px] px-1.5 py-1.5 whitespace-nowrap">
+      <div className={`flex items-center gap-0.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : ""}`}>
         <button
           className="flex items-center gap-0.5 hover:text-primary transition-colors"
           onClick={() => onSort(col.key)}
         >
           {col.label}
-          {isActive && sortDir === "asc" && <ArrowUp className="h-3 w-3 text-primary" />}
-          {isActive && sortDir === "desc" && <ArrowDown className="h-3 w-3 text-primary" />}
-          {!isActive && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+          {isActive && sortDir === "asc" && <ArrowUp className="h-2.5 w-2.5 text-primary" />}
+          {isActive && sortDir === "desc" && <ArrowDown className="h-2.5 w-2.5 text-primary" />}
+          {!isActive && <ArrowUpDown className="h-2.5 w-2.5 opacity-30" />}
         </button>
         {col.filterable !== false && (
           <Popover>
             <PopoverTrigger asChild>
               <button className={`ml-0.5 ${hasFilter ? "text-primary" : "opacity-30 hover:opacity-70"} transition-colors`}>
-                <Filter className="h-3 w-3" />
+                <Filter className="h-2.5 w-2.5" />
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-44 p-2" align="start">
@@ -155,20 +155,20 @@ function EditableRow({
 
   return (
     <TableRow className="bg-muted/20">
-      <TableCell><Input className="h-7 w-20 text-xs font-semibold" value={form.ticker} onChange={(e) => set("ticker", e.target.value)} /></TableCell>
-      <TableCell><Input className="h-7 w-16 text-xs text-right" type="number" min={0} value={form.quantity || ""} onChange={(e) => set("quantity", Number(e.target.value))} /></TableCell>
-      <TableCell><Input className="h-7 w-20 text-xs text-right" type="number" step="0.01" value={form.currentPrice || ""} onChange={(e) => set("currentPrice", Number(e.target.value))} /></TableCell>
-      <TableCell className="text-right"><span className="font-mono-display text-sm text-muted-foreground">{fmt(form.quantity * form.currentPrice)}</span></TableCell>
-      <TableCell><Input className="h-7 w-20 text-xs text-right" type="number" step="0.01" value={form.averagePrice || ""} onChange={(e) => set("averagePrice", Number(e.target.value))} /></TableCell>
-      <TableCell><Input className="h-7 w-24 text-xs text-right" type="number" step="0.01" value={form.totalInvested || ""} onChange={(e) => set("totalInvested", Number(e.target.value))} /></TableCell>
-      <TableCell className="text-right"><span className="font-mono-display text-sm text-muted-foreground">—</span></TableCell>
-      <TableCell><Input className="h-7 w-20 text-xs text-right" type="number" step="0.01" value={form.dividendYield || ""} onChange={(e) => set("dividendYield", Number(e.target.value))} /></TableCell>
-      <TableCell><Input className="h-7 w-16 text-xs text-right" type="number" step="0.01" value={form.pvp || ""} onChange={(e) => set("pvp", Number(e.target.value))} /></TableCell>
-      <TableCell colSpan={4} className="text-center text-muted-foreground text-xs">Campos calculados serão atualizados ao salvar</TableCell>
-      <TableCell>
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-positive hover:text-positive" onClick={handleSave}><Check className="h-3.5 w-3.5" /></Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-negative" onClick={onCancel}><X className="h-3.5 w-3.5" /></Button>
+      <TableCell className="px-1.5"><Input className="h-6 w-full text-xs font-semibold" value={form.ticker} onChange={(e) => set("ticker", e.target.value)} /></TableCell>
+      <TableCell className="px-1.5"><Input className="h-6 w-full text-xs text-right" type="number" min={0} value={form.quantity || ""} onChange={(e) => set("quantity", Number(e.target.value))} /></TableCell>
+      <TableCell className="px-1.5"><Input className="h-6 w-full text-xs text-right" type="number" step="0.01" value={form.currentPrice || ""} onChange={(e) => set("currentPrice", Number(e.target.value))} /></TableCell>
+      <TableCell className="text-right px-1.5"><span className="font-mono-display text-xs text-muted-foreground">{fmt(form.quantity * form.currentPrice)}</span></TableCell>
+      <TableCell className="px-1.5"><Input className="h-6 w-full text-xs text-right" type="number" step="0.01" value={form.averagePrice || ""} onChange={(e) => set("averagePrice", Number(e.target.value))} /></TableCell>
+      <TableCell className="px-1.5"><Input className="h-6 w-full text-xs text-right" type="number" step="0.01" value={form.totalInvested || ""} onChange={(e) => set("totalInvested", Number(e.target.value))} /></TableCell>
+      <TableCell className="text-right px-1.5"><span className="font-mono-display text-xs text-muted-foreground">—</span></TableCell>
+      <TableCell className="px-1.5"><Input className="h-6 w-full text-xs text-right" type="number" step="0.01" value={form.dividendYield || ""} onChange={(e) => set("dividendYield", Number(e.target.value))} /></TableCell>
+      <TableCell className="px-1.5"><Input className="h-6 w-full text-xs text-right" type="number" step="0.01" value={form.pvp || ""} onChange={(e) => set("pvp", Number(e.target.value))} /></TableCell>
+      <TableCell colSpan={4} className="text-center text-muted-foreground text-[10px] px-1.5">Campos calculados atualizarão ao salvar</TableCell>
+      <TableCell className="px-1.5">
+        <div className="flex gap-0.5">
+          <Button variant="ghost" size="icon" className="h-6 w-6 text-positive hover:text-positive" onClick={handleSave}><Check className="h-3 w-3" /></Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-negative" onClick={onCancel}><X className="h-3 w-3" /></Button>
         </div>
       </TableCell>
     </TableRow>
@@ -200,7 +200,6 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
   const processed = useMemo(() => {
     let result = [...assets];
 
-    // Apply filters
     for (const [key, value] of Object.entries(filters)) {
       if (!value) continue;
       const col = columns.find((c) => c.key === key);
@@ -212,7 +211,6 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
       });
     }
 
-    // Apply sort
     if (sortKey && sortDir) {
       const col = columns.find((c) => c.key === sortKey);
       if (col) {
@@ -248,8 +246,8 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
           </Button>
         </div>
       )}
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <Table>
+      <div className="rounded-lg border border-border">
+        <Table className="table-fixed w-full">
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
               {columns.map((col) => (
@@ -263,7 +261,6 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
                   onFilter={handleFilter}
                 />
               ))}
-              <TableHead className="font-mono-display text-xs w-16"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -277,40 +274,56 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
                 />
               ) : (
                 <TableRow key={a.id} className="hover:bg-muted/30 transition-colors">
-                  <TableCell className="font-mono-display font-semibold text-primary">{a.ticker}</TableCell>
-                  <TableCell className="text-right font-mono-display text-sm">{a.quantity}</TableCell>
-                  <TableCell className="text-right"><ValueCell value={a.currentPrice} /></TableCell>
-                  <TableCell className="text-right"><ValueCell value={a.totalCurrent} /></TableCell>
-                  <TableCell className="text-right"><ValueCell value={a.averagePrice} /></TableCell>
-                  <TableCell className="text-right"><ValueCell value={a.totalInvested} /></TableCell>
-                  <TableCell className="text-right"><ValueCell value={a.difference} colored /></TableCell>
-                  <TableCell className="text-right"><ValueCell value={a.dividendYield} /></TableCell>
-                  <TableCell className="text-right font-mono-display text-sm">{a.pvp.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
-                    <span className={`font-mono-display text-sm ${a.monthlyProfitability > 0.8 ? "text-positive" : "text-muted-foreground"}`}>
+                  <TableCell className="px-1.5 py-1.5">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="font-mono-display font-semibold text-primary text-xs hover:underline cursor-pointer">
+                          {a.ticker}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-36 p-1" align="start">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start gap-2 h-8 text-xs"
+                          onClick={() => setEditingId(a.id)}
+                        >
+                          <Pencil className="h-3 w-3" /> Editar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start gap-2 h-8 text-xs text-destructive hover:text-destructive"
+                          onClick={() => onRemove(a.id)}
+                        >
+                          <Trash2 className="h-3 w-3" /> Excluir
+                        </Button>
+                      </PopoverContent>
+                    </Popover>
+                  </TableCell>
+                  <TableCell className="text-right font-mono-display text-xs px-1.5 py-1.5">{a.quantity}</TableCell>
+                  <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.currentPrice} /></TableCell>
+                  <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.totalCurrent} /></TableCell>
+                  <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.averagePrice} /></TableCell>
+                  <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.totalInvested} /></TableCell>
+                  <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.difference} colored /></TableCell>
+                  <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.dividendYield} /></TableCell>
+                  <TableCell className="text-right font-mono-display text-xs px-1.5 py-1.5">{a.pvp.toFixed(2)}</TableCell>
+                  <TableCell className="text-right px-1.5 py-1.5">
+                    <span className={`font-mono-display text-xs ${a.monthlyProfitability > 0.8 ? "text-positive" : "text-muted-foreground"}`}>
                       {pct(a.monthlyProfitability)}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right"><ValueCell value={a.priceVariation} colored /></TableCell>
-                  <TableCell className="text-center"><StarRating rating={a.rating} /></TableCell>
-                  <TableCell className="text-right font-mono-display text-sm">{pct(a.portfolioProportion)}</TableCell>
-                  <TableCell className="text-right"><ValueCell value={a.totalVariationPerShare} colored /></TableCell>
-                  <TableCell>
-                    <div className="flex gap-0.5">
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => setEditingId(a.id)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-negative" onClick={() => onRemove(a.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.priceVariation} colored /></TableCell>
+                  <TableCell className="text-center px-1.5 py-1.5"><StarRating rating={a.rating} /></TableCell>
+                  <TableCell className="text-right font-mono-display text-xs px-1.5 py-1.5">{pct(a.portfolioProportion)}</TableCell>
+                  <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.totalVariationPerShare} colored /></TableCell>
                 </TableRow>
               )
             )}
             {processed.length === 0 && (
               <TableRow>
-                <TableCell colSpan={15} className="text-center py-8 text-muted-foreground text-sm">
+                <TableCell colSpan={14} className="text-center py-8 text-muted-foreground text-sm">
                   Nenhum ativo corresponde aos filtros aplicados
                 </TableCell>
               </TableRow>
