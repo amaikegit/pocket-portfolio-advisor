@@ -244,7 +244,7 @@ export function usePortfolio() {
         }
       );
       const data = await res.json();
-      const results: Record<string, { price: number | null; dividendYield: number | null }> = data?.results || {};
+      const results: Record<string, { price: number | null; dividendYield: number | null; pvp: number | null }> = data?.results || {};
       const errors: string[] = [];
 
       // Update in DB and state
