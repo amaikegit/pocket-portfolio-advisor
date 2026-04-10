@@ -256,11 +256,15 @@ export function usePortfolio() {
           if (typeof quote.dividendYield === "number") {
             updates.dividendYield = quote.dividendYield;
           }
+          if (typeof quote.pvp === "number") {
+            updates.pvp = quote.pvp;
+          }
           // Update in DB (fire and forget)
           supabase.from("assets").update({
             current_price: quote.price,
             is_manual_price: false,
             ...(typeof quote.dividendYield === "number" ? { dividend_yield: quote.dividendYield } : {}),
+            ...(typeof quote.pvp === "number" ? { pvp: quote.pvp } : {}),
             updated_at: new Date().toISOString(),
           }).eq("id", a.id).then();
           return { ...a, ...updates };
@@ -270,6 +274,7 @@ export function usePortfolio() {
       });
 
       setBaseAssets(updatedAssets);
+      setLastUpdated(new Date());
       setFetchProgress({
         current: total,
         total,
@@ -290,5 +295,5 @@ export function usePortfolio() {
     totalMonthlyDY: assets.reduce((s, a) => s + (a.dividendYield * a.quantity), 0),
   };
 
-  return { assets, calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, removeTransaction, transactions, fetchAllPrices, fetchProgress, totals, loading };
+  return { assets, calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, removeTransaction, transactions, fetchAllPrices, fetchProgress, totals, loading, lastUpdated };
 }
