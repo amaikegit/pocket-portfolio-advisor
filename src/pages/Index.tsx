@@ -10,14 +10,14 @@ import { PortfolioCharts } from "@/components/PortfolioCharts";
 import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { BarChart3, RefreshCw, Loader2, FileText, LogOut, Menu } from "lucide-react";
+import { BarChart3, RefreshCw, Loader2, FileText, LogOut, Menu, Clock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Sheet, SheetContent, SheetTrigger,
 } from "@/components/ui/sheet";
 
 const Index = () => {
-  const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, transactions, assets, fetchAllPrices, fetchProgress, totals } = usePortfolio();
+  const { calculatedAssets, addAsset, updateAsset, removeAsset, importCSV, addTransaction, transactions, assets, fetchAllPrices, fetchProgress, totals, lastUpdated } = usePortfolio();
   const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
   const { signOut } = useAuth();
@@ -106,8 +106,14 @@ const Index = () => {
         )}
       </header>
 
-      {/* Content */}
+      {/* Last updated + Content */}
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+        {lastUpdated && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            <span>Última atualização: {lastUpdated.toLocaleDateString("pt-BR")} às {lastUpdated.toLocaleTimeString("pt-BR")}</span>
+          </div>
+        )}
         <SummaryCards totals={totals} />
         <PortfolioCharts assets={calculatedAssets} />
         <PortfolioTable assets={calculatedAssets} onRemove={removeAsset} onUpdate={updateAsset} />
