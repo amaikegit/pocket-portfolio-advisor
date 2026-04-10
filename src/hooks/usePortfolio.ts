@@ -224,6 +224,7 @@ export function usePortfolio() {
   }, [toast]);
 
   const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0, status: "" });
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchAllPrices = useCallback(async () => {
     const total = assets.length;
