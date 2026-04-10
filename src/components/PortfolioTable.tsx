@@ -48,6 +48,7 @@ const columns: ColumnDef[] = [
   { key: "portfolioProportion", label: "%Cart.", align: "right", accessor: (a) => a.portfolioProportion },
   { key: "totalVariationPerShare", label: "Var.Tot.", align: "right", accessor: (a) => a.totalVariationPerShare },
   { key: "buy", label: "Comprar?", align: "center", accessor: (a) => a.rating >= 3 ? 1 : 0 },
+];
 
 function ValueCell({ value, colored = false }: { value: number; colored?: boolean }) {
   const cls = colored
