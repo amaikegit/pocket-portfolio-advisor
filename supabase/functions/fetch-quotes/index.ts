@@ -7,7 +7,8 @@ const corsHeaders = {
 
 interface QuoteResult {
   price: number | null;
-  dividendYield: number | null; // monthly estimated DY in R$
+  dividendYield: number | null;
+  pvp: number | null;
 }
 
 async function fetchFromBrapi(ticker: string): Promise<number | null> {
@@ -26,7 +27,6 @@ async function fetchFromBrapi(ticker: string): Promise<number | null> {
 async function fetchFromYahooChart(ticker: string): Promise<{ price: number | null; lastDividend: number | null }> {
   try {
     const symbol = ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
-    // Fetch 1 year of data with dividend events
     const res = await fetch(
       `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1mo&range=1y&events=div`,
       { headers: { "User-Agent": "Mozilla/5.0" } }
@@ -35,15 +35,12 @@ async function fetchFromYahooChart(ticker: string): Promise<{ price: number | nu
     const result = data?.chart?.result?.[0];
     const price = result?.meta?.regularMarketPrice;
     
-    // Extract dividend events
     const divEvents = result?.events?.dividends;
     let lastDividend: number | null = null;
     
     if (divEvents && typeof divEvents === "object") {
-      // divEvents is an object keyed by timestamp
       const dividends = Object.values(divEvents) as Array<{ amount: number; date: number }>;
       if (dividends.length > 0) {
-        // Sort by date descending, get last dividend amount
         dividends.sort((a: any, b: any) => (b.date || 0) - (a.date || 0));
         const lastAmount = dividends[0]?.amount;
         if (typeof lastAmount === "number" && lastAmount > 0) {
@@ -51,8 +48,6 @@ async function fetchFromYahooChart(ticker: string): Promise<{ price: number | nu
         }
       }
     }
-
-    console.log(`Yahoo chart ${symbol}: price=${price}, dividends found=${divEvents ? Object.keys(divEvents).length : 0}, lastDiv=${lastDividend}`);
 
     return {
       price: typeof price === "number" ? price : null,
@@ -64,21 +59,39 @@ async function fetchFromYahooChart(ticker: string): Promise<{ price: number | nu
   }
 }
 
+async function fetchPvpFromYahoo(ticker: string): Promise<number | null> {
+  try {
+    const symbol = ticker.endsWith(".SA") ? ticker : `${ticker}.SA`;
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=defaultKeyStatistics`,
+      { headers: { "User-Agent": "Mozilla/5.0" } }
+    );
+    const data = await res.json();
+    const stats = data?.quoteSummary?.result?.[0]?.defaultKeyStatistics;
+    const pbRatio = stats?.priceToBook?.raw;
+    console.log(`Yahoo P/VP for ${symbol}: ${pbRatio}`);
+    return typeof pbRatio === "number" ? Math.round(pbRatio * 100) / 100 : null;
+  } catch (e) {
+    console.log(`Yahoo P/VP error for ${ticker}: ${e.message}`);
+    return null;
+  }
+}
+
 async function fetchQuote(ticker: string): Promise<QuoteResult> {
-  // Try brapi for price
   let price = await fetchFromBrapi(ticker);
   
-  // Try Yahoo chart for price + dividends
-  const yahoo = await fetchFromYahooChart(ticker);
+  const [yahoo, pvp] = await Promise.all([
+    fetchFromYahooChart(ticker),
+    fetchPvpFromYahoo(ticker),
+  ]);
+  
   if (price === null) price = yahoo.price;
 
-  // lastDividend is the most recent monthly dividend payment
-  // Use it directly as the estimated monthly DY
   const monthlyDY = yahoo.lastDividend !== null
     ? Math.round(yahoo.lastDividend * 100) / 100
     : null;
 
-  return { price, dividendYield: monthlyDY };
+  return { price, dividendYield: monthlyDY, pvp };
 }
 
 serve(async (req) => {
