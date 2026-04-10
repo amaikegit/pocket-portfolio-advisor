@@ -284,6 +284,7 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
   return (
     <div className="space-y-2">
       <TableSummaryHeader assets={assets} />
+      {activeFilters > 0 && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Filter className="h-3.5 w-3.5" />
           <span>{activeFilters} filtro(s) ativo(s) — {processed.length} de {assets.length} ativos</span>
