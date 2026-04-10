@@ -376,7 +376,7 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
             )}
             {processed.length === 0 && (
               <TableRow>
-                <TableCell colSpan={14} className="text-center py-8 text-muted-foreground text-sm">
+                <TableCell colSpan={16} className="text-center py-8 text-muted-foreground text-sm">
                   Nenhum ativo corresponde aos filtros aplicados
                 </TableCell>
               </TableRow>
