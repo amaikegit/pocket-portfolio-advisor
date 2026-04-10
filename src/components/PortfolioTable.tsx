@@ -367,8 +367,8 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
                   <TableCell className="text-right font-mono-display text-xs px-1.5 py-1.5">{pct(a.portfolioProportion)}</TableCell>
                   <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.totalVariationPerShare} colored /></TableCell>
                   <TableCell className="text-center px-1.5 py-1.5">
-                    <span className={`font-mono-display text-xs font-semibold ${a.rating >= 3 ? "text-positive" : "text-negative"}`}>
-                      {a.rating >= 3 ? "Sim" : "Não"}
+                    <span className={`font-mono-display text-xs font-semibold ${a.rating >= 4 ? "text-positive" : "text-negative"}`}>
+                      {a.rating >= 4 ? "Sim" : "Não"}
                     </span>
                   </TableCell>
                 </TableRow>
