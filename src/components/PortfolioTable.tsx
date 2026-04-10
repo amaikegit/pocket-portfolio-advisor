@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Check, X, ArrowUpDown, ArrowUp, ArrowDown, Filter, Pencil, Trash2 } from "lucide-react";
+import { Check, X, ArrowUpDown, ArrowUp, ArrowDown, Filter, Pencil, Trash2, BarChart3 } from "lucide-react";
 import { Asset, AssetCalculated } from "@/types/portfolio";
 import { StarRating } from "@/components/StarRating";
 import {
