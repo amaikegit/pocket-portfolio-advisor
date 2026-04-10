@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Check, X, ArrowUpDown, ArrowUp, ArrowDown, Filter, Pencil, Trash2 } from "lucide-react";
+import { Check, X, ArrowUpDown, ArrowUp, ArrowDown, Filter, Pencil, Trash2, BarChart3 } from "lucide-react";
 import { Asset, AssetCalculated } from "@/types/portfolio";
 import { StarRating } from "@/components/StarRating";
 import {
@@ -175,12 +175,58 @@ function EditableRow({
   );
 }
 
+function TableSummaryHeader({ assets }: { assets: AssetCalculated[] }) {
+  const totalValue = assets.reduce((s, a) => s + a.totalCurrent, 0);
+  const totalInvested = assets.reduce((s, a) => s + a.totalInvested, 0);
+  const variation = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+  const avgProfitability = assets.length > 0 ? assets.reduce((s, a) => s + a.monthlyProfitability, 0) / assets.length : 0;
+
+  return (
+    <div className="rounded-lg border border-border bg-card/50 p-3 sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-6">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center">
+            <BarChart3 className="h-4 w-4 text-primary" />
+          </div>
+          <span className="font-mono-display font-bold text-sm sm:text-base">Meus Ativos</span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 sm:gap-8 text-xs sm:text-sm">
+          <div className="text-center">
+            <p className="text-muted-foreground text-[10px] sm:text-xs">Ativos</p>
+            <p className="font-mono-display font-semibold">{assets.length}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-muted-foreground text-[10px] sm:text-xs">Valor total</p>
+            <p className="font-mono-display font-semibold">{fmt(totalValue)}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-muted-foreground text-[10px] sm:text-xs">Variação</p>
+            <p className={`font-mono-display font-semibold ${variation > 0 ? "text-positive" : variation < 0 ? "text-negative" : ""}`}>
+              {pct(variation)} {variation > 0 ? "▲" : variation < 0 ? "▼" : ""}
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-muted-foreground text-[10px] sm:text-xs">Rentabilidade</p>
+            <p className={`font-mono-display font-semibold ${avgProfitability > 0 ? "text-positive" : ""}`}>
+              {pct(avgProfitability)} ↗
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="text-muted-foreground text-[10px] sm:text-xs">% na carteira</p>
+            <p className="font-mono-display font-semibold">100%</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
   const [filters, setFilters] = useState<Record<string, string>>({});
-
   const handleSort = (key: string) => {
     if (sortKey === key) {
       setSortDir(sortDir === "asc" ? "desc" : sortDir === "desc" ? null : "asc");
@@ -237,6 +283,7 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
 
   return (
     <div className="space-y-2">
+      <TableSummaryHeader assets={assets} />
       {activeFilters > 0 && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Filter className="h-3.5 w-3.5" />
