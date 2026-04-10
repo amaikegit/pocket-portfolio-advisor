@@ -47,6 +47,7 @@ const columns: ColumnDef[] = [
   { key: "rating", label: "Rating", align: "center", accessor: (a) => a.rating },
   { key: "portfolioProportion", label: "%Cart.", align: "right", accessor: (a) => a.portfolioProportion },
   { key: "totalVariationPerShare", label: "Var.Tot.", align: "right", accessor: (a) => a.totalVariationPerShare },
+  { key: "buy", label: "Comprar?", align: "center", accessor: (a) => a.rating >= 3 ? 1 : 0 },
 ];
 
 function ValueCell({ value, colored = false }: { value: number; colored?: boolean }) {
@@ -365,12 +366,17 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
                   <TableCell className="text-center px-1.5 py-1.5"><StarRating rating={a.rating} /></TableCell>
                   <TableCell className="text-right font-mono-display text-xs px-1.5 py-1.5">{pct(a.portfolioProportion)}</TableCell>
                   <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.totalVariationPerShare} colored /></TableCell>
+                  <TableCell className="text-center px-1.5 py-1.5">
+                    <span className={`font-mono-display text-xs font-semibold ${a.rating >= 3 ? "text-positive" : "text-negative"}`}>
+                      {a.rating >= 3 ? "Sim" : "Não"}
+                    </span>
+                  </TableCell>
                 </TableRow>
               )
             )}
             {processed.length === 0 && (
               <TableRow>
-                <TableCell colSpan={14} className="text-center py-8 text-muted-foreground text-sm">
+                <TableCell colSpan={16} className="text-center py-8 text-muted-foreground text-sm">
                   Nenhum ativo corresponde aos filtros aplicados
                 </TableCell>
               </TableRow>
