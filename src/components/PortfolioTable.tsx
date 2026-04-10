@@ -356,7 +356,7 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
                   <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.totalInvested} /></TableCell>
                   <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.difference} colored /></TableCell>
                   <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.dividendYield} /></TableCell>
-                  <TableCell className="text-right font-mono-display text-xs px-1.5 py-1.5">{a.pvp.toFixed(2)}</TableCell>
+                  <TableCell className={`text-right font-mono-display text-xs px-1.5 py-1.5 ${a.pvp > 1 ? "text-negative" : ""}`}>{a.pvp.toFixed(2)}</TableCell>
                   <TableCell className="text-right px-1.5 py-1.5">
                     <span className={`font-mono-display text-xs ${a.monthlyProfitability > 0.8 ? "text-positive" : "text-muted-foreground"}`}>
                       {pct(a.monthlyProfitability)}
