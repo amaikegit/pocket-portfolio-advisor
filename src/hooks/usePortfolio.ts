@@ -111,7 +111,12 @@ export function usePortfolio() {
         supabase.from("assets").select("*").eq("user_id", user.id),
         supabase.from("transactions").select("*").eq("user_id", user.id),
       ]);
-      if (assetsRes.data) setBaseAssets(assetsRes.data.map(rowToAsset));
+      if (assetsRes.data) {
+        setBaseAssets(assetsRes.data.map(rowToAsset));
+        // Set lastUpdated from max updated_at
+        const dates = assetsRes.data.map(r => new Date(r.updated_at)).filter(d => !isNaN(d.getTime()));
+        if (dates.length > 0) setLastUpdated(new Date(Math.max(...dates.map(d => d.getTime()))));
+      }
       if (txRes.data) setTransactions(txRes.data.map(rowToTransaction));
       setLoading(false);
     };
