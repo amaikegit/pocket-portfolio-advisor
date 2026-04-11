@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDividends, DividendInput } from "@/hooks/useDividends";
+import { CSVImportDividendsDialog } from "@/components/CSVImportDividendsDialog";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ const formatBRL = (v: number) =>
 
 const Dividends = () => {
   const {
-    dividends, loading, addDividend, removeDividend,
+    dividends, loading, addDividend, bulkImportDividends, removeDividend,
     years, months, monthlyByYear, totalByYear, totalAll, totalByMonth, averageMonthly,
   } = useDividends();
   const { assets } = usePortfolio();
@@ -94,6 +95,7 @@ const Dividends = () => {
               <ArrowLeft className="h-4 w-4" />
               <span className="hidden sm:inline">Voltar</span>
             </Button>
+            <CSVImportDividendsDialog onImport={bulkImportDividends} />
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
