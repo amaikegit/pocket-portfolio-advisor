@@ -59,6 +59,42 @@ export type Database = {
         }
         Relationships: []
       }
+      dividends: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          month: number
+          payment_date: string
+          ticker: string
+          updated_at: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          month: number
+          payment_date?: string
+          ticker: string
+          updated_at?: string
+          user_id: string
+          year: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          month?: number
+          payment_date?: string
+          ticker?: string
+          updated_at?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           asset_type: string
