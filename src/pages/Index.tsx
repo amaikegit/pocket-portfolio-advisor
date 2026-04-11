@@ -10,7 +10,7 @@ import { PortfolioCharts } from "@/components/PortfolioCharts";
 import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { BarChart3, RefreshCw, Loader2, FileText, LogOut, Menu, Clock } from "lucide-react";
+import { BarChart3, RefreshCw, Loader2, FileText, LogOut, Menu, Clock, DollarSign } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Sheet, SheetContent, SheetTrigger,
@@ -58,6 +58,10 @@ const Index = () => {
               <FileText className="h-4 w-4" />
               Lançamentos
             </Button>
+            <Button variant="outline" className="gap-2" onClick={() => navigate("/dividendos")}>
+              <DollarSign className="h-4 w-4" />
+              Dividendos
+            </Button>
             <Button variant="ghost" size="icon" onClick={signOut} title="Sair">
               <LogOut className="h-4 w-4" />
             </Button>
@@ -84,6 +88,10 @@ const Index = () => {
                   <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate("/lancamentos")}>
                     <FileText className="h-4 w-4" />
                     Lançamentos
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate("/dividendos")}>
+                    <DollarSign className="h-4 w-4" />
+                    Dividendos
                   </Button>
                   <Button variant="ghost" className="w-full justify-start gap-2 text-destructive" onClick={signOut}>
                     <LogOut className="h-4 w-4" />
