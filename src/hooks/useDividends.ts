@@ -77,6 +77,29 @@ export function useDividends() {
     [session?.user?.id, toast, fetchDividends]
   );
 
+  const bulkImportDividends = useCallback(
+    async (inputs: DividendInput[]): Promise<number> => {
+      if (!session?.user?.id || inputs.length === 0) return 0;
+      const rows = inputs.map((input) => ({
+        user_id: session.user.id,
+        ticker: input.ticker.toUpperCase(),
+        amount: input.amount,
+        payment_date: input.payment_date,
+        month: input.month,
+        year: input.year,
+      }));
+      const { error } = await supabase.from("dividends").insert(rows);
+      if (error) {
+        toast({ title: "Erro ao importar dividendos", description: error.message, variant: "destructive" });
+        return 0;
+      }
+      toast({ title: `${inputs.length} dividendo(s) importado(s)!` });
+      await fetchDividends();
+      return inputs.length;
+    },
+    [session?.user?.id, toast, fetchDividends]
+  );
+
   const removeDividend = useCallback(
     async (id: string) => {
       const { error } = await supabase.from("dividends").delete().eq("id", id);
@@ -121,6 +144,7 @@ export function useDividends() {
     dividends,
     loading,
     addDividend,
+    bulkImportDividends,
     removeDividend,
     years,
     months,
