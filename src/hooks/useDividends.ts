@@ -100,6 +100,26 @@ export function useDividends() {
     [session?.user?.id, toast, fetchDividends]
   );
 
+  const updateDividend = useCallback(
+    async (id: string, input: DividendInput) => {
+      if (!session?.user?.id) return;
+      const { error } = await supabase.from("dividends").update({
+        ticker: input.ticker.toUpperCase(),
+        amount: input.amount,
+        payment_date: input.payment_date,
+        month: input.month,
+        year: input.year,
+      }).eq("id", id);
+      if (error) {
+        toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Dividendo atualizado!" });
+      await fetchDividends();
+    },
+    [session?.user?.id, toast, fetchDividends]
+  );
+
   const removeDividend = useCallback(
     async (id: string) => {
       const { error } = await supabase.from("dividends").delete().eq("id", id);
@@ -108,6 +128,20 @@ export function useDividends() {
         return;
       }
       setDividends((prev) => prev.filter((d) => d.id !== id));
+    },
+    [toast]
+  );
+
+  const bulkRemoveDividends = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return;
+      const { error } = await supabase.from("dividends").delete().in("id", ids);
+      if (error) {
+        toast({ title: "Erro ao remover", description: error.message, variant: "destructive" });
+        return;
+      }
+      toast({ title: `${ids.length} dividendo(s) removido(s)!` });
+      setDividends((prev) => prev.filter((d) => !ids.includes(d.id)));
     },
     [toast]
   );
@@ -144,8 +178,10 @@ export function useDividends() {
     dividends,
     loading,
     addDividend,
+    updateDividend,
     bulkImportDividends,
     removeDividend,
+    bulkRemoveDividends,
     years,
     months,
     monthlyByYear,
