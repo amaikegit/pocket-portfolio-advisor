@@ -61,6 +61,15 @@ const Dividends = () => {
   // Yearly totals for line chart
   const lineData = displayYears.map((y) => ({ year: y.toString(), total: totalByYear(y) }));
 
+  // Pie chart data: distribution by ticker
+  const PIE_COLORS = ["hsl(142, 60%, 45%)", "hsl(38, 90%, 55%)", "hsl(200, 70%, 50%)", "hsl(280, 60%, 55%)", "hsl(0, 70%, 50%)", "hsl(170, 60%, 45%)", "hsl(320, 60%, 55%)", "hsl(60, 80%, 45%)"];
+  const pieData = Object.entries(
+    dividends.reduce<Record<string, number>>((acc, d) => {
+      acc[d.ticker] = (acc[d.ticker] || 0) + d.amount;
+      return acc;
+    }, {})
+  ).map(([ticker, total]) => ({ ticker, total })).sort((a, b) => b.total - a.total);
+
   const chartConfig: Record<string, { label: string; color: string }> = {};
   const colors = ["hsl(142, 60%, 45%)", "hsl(38, 90%, 55%)", "hsl(200, 70%, 50%)", "hsl(280, 60%, 55%)", "hsl(0, 70%, 50%)"];
   displayYears.forEach((y, i) => {
