@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useDividends, DividendInput } from "@/hooks/useDividends";
+import { useDividends, Dividend, DividendInput } from "@/hooks/useDividends";
 import { CSVImportDividendsDialog } from "@/components/CSVImportDividendsDialog";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,8 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { BarChart3, Plus, ArrowLeft, LogOut, DollarSign, TrendingUp, Calendar, Loader2, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell } from "recharts";
+import { BarChart3, Plus, ArrowLeft, LogOut, DollarSign, TrendingUp, Calendar, Loader2, Trash2, Pencil, Filter } from "lucide-react";
 
 const MONTH_NAMES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
@@ -21,47 +22,102 @@ const formatBRL = (v: number) =>
 
 const Dividends = () => {
   const {
-    dividends, loading, addDividend, bulkImportDividends, removeDividend,
-    years, months, monthlyByYear, totalByYear, totalAll, totalByMonth, averageMonthly,
+    dividends, loading, addDividend, updateDividend, bulkImportDividends, removeDividend, bulkRemoveDividends,
+    years, monthlyByYear, totalByYear, totalAll, averageMonthly,
   } = useDividends();
   const { assets } = usePortfolio();
   const { signOut } = useAuth();
   const navigate = useNavigate();
 
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingDividend, setEditingDividend] = useState<Dividend | null>(null);
   const [form, setForm] = useState({ ticker: "", amount: "", month: "", year: "", date: "" });
+  const [filterYear, setFilterYear] = useState<string>("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const currentYear = new Date().getFullYear();
+  const existingTickers = assets.map((a) => a.ticker);
+
+  const resetForm = () => setForm({ ticker: "", amount: "", month: "", year: "", date: "" });
 
   const handleAdd = async () => {
     if (!form.ticker || !form.amount || !form.month || !form.year) return;
-    const input: DividendInput = {
+    await addDividend({
       ticker: form.ticker,
       amount: parseFloat(form.amount.replace(",", ".")),
       payment_date: form.date || new Date().toISOString().slice(0, 10),
       month: parseInt(form.month),
       year: parseInt(form.year),
-    };
-    await addDividend(input);
-    setForm({ ticker: "", amount: "", month: "", year: "", date: "" });
+    });
+    resetForm();
     setOpen(false);
   };
 
+  const handleEditOpen = (d: Dividend) => {
+    setEditingDividend(d);
+    setForm({
+      ticker: d.ticker,
+      amount: d.amount.toString().replace(".", ","),
+      month: d.month.toString(),
+      year: d.year.toString(),
+      date: d.payment_date,
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingDividend || !form.ticker || !form.amount || !form.month || !form.year) return;
+    await updateDividend(editingDividend.id, {
+      ticker: form.ticker,
+      amount: parseFloat(form.amount.replace(",", ".")),
+      payment_date: form.date || editingDividend.payment_date,
+      month: parseInt(form.month),
+      year: parseInt(form.year),
+    });
+    resetForm();
+    setEditingDividend(null);
+    setEditOpen(false);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const filteredDividends = filterYear === "all"
+    ? dividends
+    : dividends.filter((d) => d.year === parseInt(filterYear));
+
+  const sortedDividends = [...filteredDividends].sort((a, b) => b.year - a.year || b.month - a.month);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === sortedDividends.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(sortedDividends.map((d) => d.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    await bulkRemoveDividends(Array.from(selectedIds));
+    setSelectedIds(new Set());
+  };
+
   const grid = monthlyByYear();
-  const currentYear = new Date().getFullYear();
   const displayYears = years.length > 0 ? years : [currentYear];
 
-  // Chart data: monthly totals for each year as bar chart
   const barData = MONTH_NAMES.map((m, i) => {
     const row: any = { month: m };
-    for (const y of displayYears) {
-      row[y] = grid[y]?.[i + 1] || 0;
-    }
+    for (const y of displayYears) row[y] = grid[y]?.[i + 1] || 0;
     return row;
   });
 
-  // Yearly totals for line chart
   const lineData = displayYears.map((y) => ({ year: y.toString(), total: totalByYear(y) }));
 
-  // Pie chart data: distribution by ticker
   const PIE_COLORS = ["hsl(142, 60%, 45%)", "hsl(38, 90%, 55%)", "hsl(200, 70%, 50%)", "hsl(280, 60%, 55%)", "hsl(0, 70%, 50%)", "hsl(170, 60%, 45%)", "hsl(320, 60%, 55%)", "hsl(60, 80%, 45%)"];
   const pieData = Object.entries(
     dividends.reduce<Record<string, number>>((acc, d) => {
@@ -76,8 +132,6 @@ const Dividends = () => {
     chartConfig[y] = { label: y.toString(), color: colors[i % colors.length] };
   });
 
-  const existingTickers = assets.map((a) => a.ticker);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -85,6 +139,52 @@ const Dividends = () => {
       </div>
     );
   }
+
+  // Shared form fields component
+  const FormFields = () => (
+    <div className="space-y-3 pt-2">
+      <div>
+        <label className="text-sm text-muted-foreground">Ticker</label>
+        {existingTickers.length > 0 ? (
+          <Select value={form.ticker} onValueChange={(v) => setForm((f) => ({ ...f, ticker: v }))}>
+            <SelectTrigger><SelectValue placeholder="Selecione o ativo" /></SelectTrigger>
+            <SelectContent>
+              {existingTickers.map((t) => (
+                <SelectItem key={t} value={t}>{t}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Input placeholder="Ex: MXRF11" value={form.ticker} onChange={(e) => setForm((f) => ({ ...f, ticker: e.target.value }))} />
+        )}
+      </div>
+      <div>
+        <label className="text-sm text-muted-foreground">Valor (R$)</label>
+        <Input placeholder="0,00" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-sm text-muted-foreground">Mês</label>
+          <Select value={form.month} onValueChange={(v) => setForm((f) => ({ ...f, month: v }))}>
+            <SelectTrigger><SelectValue placeholder="Mês" /></SelectTrigger>
+            <SelectContent>
+              {MONTH_NAMES.map((m, i) => (
+                <SelectItem key={i} value={(i + 1).toString()}>{m.toUpperCase()}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-sm text-muted-foreground">Ano</label>
+          <Input type="number" placeholder={currentYear.toString()} value={form.year} onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))} />
+        </div>
+      </div>
+      <div>
+        <label className="text-sm text-muted-foreground">Data do Pagamento</label>
+        <Input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -105,7 +205,7 @@ const Dividends = () => {
               <span className="hidden sm:inline">Voltar</span>
             </Button>
             <CSVImportDividendsDialog onImport={bulkImportDividends} />
-            <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
                   <Plus className="h-4 w-4" />
@@ -116,49 +216,8 @@ const Dividends = () => {
                 <DialogHeader>
                   <DialogTitle>Registrar Dividendo</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-3 pt-2">
-                  <div>
-                    <label className="text-sm text-muted-foreground">Ticker</label>
-                    {existingTickers.length > 0 ? (
-                      <Select value={form.ticker} onValueChange={(v) => setForm((f) => ({ ...f, ticker: v }))}>
-                        <SelectTrigger><SelectValue placeholder="Selecione o ativo" /></SelectTrigger>
-                        <SelectContent>
-                          {existingTickers.map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input placeholder="Ex: MXRF11" value={form.ticker} onChange={(e) => setForm((f) => ({ ...f, ticker: e.target.value }))} />
-                    )}
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Valor (R$)</label>
-                    <Input placeholder="0,00" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-sm text-muted-foreground">Mês</label>
-                      <Select value={form.month} onValueChange={(v) => setForm((f) => ({ ...f, month: v }))}>
-                        <SelectTrigger><SelectValue placeholder="Mês" /></SelectTrigger>
-                        <SelectContent>
-                          {MONTH_NAMES.map((m, i) => (
-                            <SelectItem key={i} value={(i + 1).toString()}>{m.toUpperCase()}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-sm text-muted-foreground">Ano</label>
-                      <Input type="number" placeholder={currentYear.toString()} value={form.year} onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Data do Pagamento</label>
-                    <Input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
-                  </div>
-                  <Button className="w-full" onClick={handleAdd}>Salvar</Button>
-                </div>
+                <FormFields />
+                <Button className="w-full" onClick={handleAdd}>Salvar</Button>
               </DialogContent>
             </Dialog>
             <Button variant="ghost" size="icon" onClick={signOut} title="Sair">
@@ -167,6 +226,17 @@ const Dividends = () => {
           </div>
         </div>
       </header>
+
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) { resetForm(); setEditingDividend(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Dividendo</DialogTitle>
+          </DialogHeader>
+          <FormFields />
+          <Button className="w-full" onClick={handleEditSave}>Atualizar</Button>
+        </DialogContent>
+      </Dialog>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-6">
         {/* Summary Cards */}
@@ -229,7 +299,6 @@ const Dividends = () => {
               </ChartContainer>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-mono">Evolução Anual</CardTitle>
@@ -248,7 +317,7 @@ const Dividends = () => {
           </Card>
         </div>
 
-        {/* Pie Chart - Distribution by Ticker */}
+        {/* Pie Chart */}
         {pieData.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
@@ -324,35 +393,76 @@ const Dividends = () => {
           </CardContent>
         </Card>
 
-        {/* Individual Dividends List with Delete */}
+        {/* Individual Records with filter, multi-select, edit, delete */}
         {dividends.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-mono uppercase">Registros Individuais</CardTitle>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="text-sm font-mono uppercase">Registros Individuais</CardTitle>
+                <div className="flex items-center gap-2">
+                  {selectedIds.size > 0 && (
+                    <Button variant="destructive" size="sm" className="gap-1.5" onClick={handleBulkDelete}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Excluir {selectedIds.size}
+                    </Button>
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Select value={filterYear} onValueChange={(v) => { setFilterYear(v); setSelectedIds(new Set()); }}>
+                      <SelectTrigger className="h-8 w-[100px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {years.map((y) => (
+                          <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-auto max-h-[400px]">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10 text-center">
+                        <Checkbox
+                          checked={sortedDividends.length > 0 && selectedIds.size === sortedDividends.length}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </TableHead>
                       <TableHead className="font-mono text-xs">Ticker</TableHead>
                       <TableHead className="font-mono text-xs text-right">Valor</TableHead>
                       <TableHead className="font-mono text-xs text-center">Mês/Ano</TableHead>
                       <TableHead className="font-mono text-xs text-center">Data Pgto</TableHead>
-                      <TableHead className="font-mono text-xs text-center w-12"></TableHead>
+                      <TableHead className="font-mono text-xs text-center w-20">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {[...dividends].sort((a, b) => b.year - a.year || b.month - a.month).map((d) => (
-                      <TableRow key={d.id}>
+                    {sortedDividends.map((d) => (
+                      <TableRow key={d.id} className={selectedIds.has(d.id) ? "bg-muted/50" : ""}>
+                        <TableCell className="text-center">
+                          <Checkbox
+                            checked={selectedIds.has(d.id)}
+                            onCheckedChange={() => toggleSelect(d.id)}
+                          />
+                        </TableCell>
                         <TableCell className="font-mono text-xs font-medium">{d.ticker}</TableCell>
                         <TableCell className="font-mono text-xs text-right text-primary">{formatBRL(d.amount)}</TableCell>
                         <TableCell className="font-mono text-xs text-center">{MONTH_NAMES[d.month - 1]?.toUpperCase()}/{d.year}</TableCell>
                         <TableCell className="font-mono text-xs text-center text-muted-foreground">{d.payment_date}</TableCell>
                         <TableCell className="text-center">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => removeDividend(d.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          <div className="flex items-center justify-center gap-0.5">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => handleEditOpen(d)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => removeDividend(d.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
