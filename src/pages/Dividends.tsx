@@ -11,8 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, ResponsiveContainer } from "recharts";
-import { BarChart3, Plus, ArrowLeft, LogOut, DollarSign, TrendingUp, Calendar, Loader2 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { BarChart3, Plus, ArrowLeft, LogOut, DollarSign, TrendingUp, Calendar, Loader2, Trash2 } from "lucide-react";
 
 const MONTH_NAMES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
@@ -60,6 +60,15 @@ const Dividends = () => {
 
   // Yearly totals for line chart
   const lineData = displayYears.map((y) => ({ year: y.toString(), total: totalByYear(y) }));
+
+  // Pie chart data: distribution by ticker
+  const PIE_COLORS = ["hsl(142, 60%, 45%)", "hsl(38, 90%, 55%)", "hsl(200, 70%, 50%)", "hsl(280, 60%, 55%)", "hsl(0, 70%, 50%)", "hsl(170, 60%, 45%)", "hsl(320, 60%, 55%)", "hsl(60, 80%, 45%)"];
+  const pieData = Object.entries(
+    dividends.reduce<Record<string, number>>((acc, d) => {
+      acc[d.ticker] = (acc[d.ticker] || 0) + d.amount;
+      return acc;
+    }, {})
+  ).map(([ticker, total]) => ({ ticker, total })).sort((a, b) => b.total - a.total);
 
   const chartConfig: Record<string, { label: string; color: string }> = {};
   const colors = ["hsl(142, 60%, 45%)", "hsl(38, 90%, 55%)", "hsl(200, 70%, 50%)", "hsl(280, 60%, 55%)", "hsl(0, 70%, 50%)"];
@@ -239,7 +248,39 @@ const Dividends = () => {
           </Card>
         </div>
 
-        {/* Monthly Table (like the reference image) */}
+        {/* Pie Chart - Distribution by Ticker */}
+        {pieData.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-mono">Distribuição por Ativo</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col lg:flex-row items-center gap-4">
+                <ChartContainer config={{ total: { label: "Total", color: "hsl(142,60%,45%)" } }} className="h-[280px] w-full lg:w-1/2">
+                  <PieChart>
+                    <Pie data={pieData} dataKey="total" nameKey="ticker" cx="50%" cy="50%" outerRadius={100} label={({ ticker, percent }) => `${ticker} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={11}>
+                      {pieData.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatBRL(Number(value))} />} />
+                  </PieChart>
+                </ChartContainer>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full lg:w-1/2">
+                  {pieData.map((item, i) => (
+                    <div key={item.ticker} className="flex items-center gap-2 text-xs">
+                      <div className="h-3 w-3 rounded-sm shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                      <span className="font-mono font-medium">{item.ticker}</span>
+                      <span className="text-muted-foreground ml-auto">{formatBRL(item.total)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Monthly Table */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-mono uppercase">Dividendos Pagos</CardTitle>
@@ -269,7 +310,6 @@ const Dividends = () => {
                       })}
                     </TableRow>
                   ))}
-                  {/* Totals row */}
                   <TableRow className="border-t-2 border-primary/30 font-bold">
                     <TableCell className="font-mono text-xs sticky left-0 bg-card z-10">Total</TableCell>
                     {displayYears.map((y) => (
@@ -283,6 +323,45 @@ const Dividends = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Individual Dividends List with Delete */}
+        {dividends.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-mono uppercase">Registros Individuais</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-auto max-h-[400px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="font-mono text-xs">Ticker</TableHead>
+                      <TableHead className="font-mono text-xs text-right">Valor</TableHead>
+                      <TableHead className="font-mono text-xs text-center">Mês/Ano</TableHead>
+                      <TableHead className="font-mono text-xs text-center">Data Pgto</TableHead>
+                      <TableHead className="font-mono text-xs text-center w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[...dividends].sort((a, b) => b.year - a.year || b.month - a.month).map((d) => (
+                      <TableRow key={d.id}>
+                        <TableCell className="font-mono text-xs font-medium">{d.ticker}</TableCell>
+                        <TableCell className="font-mono text-xs text-right text-primary">{formatBRL(d.amount)}</TableCell>
+                        <TableCell className="font-mono text-xs text-center">{MONTH_NAMES[d.month - 1]?.toUpperCase()}/{d.year}</TableCell>
+                        <TableCell className="font-mono text-xs text-center text-muted-foreground">{d.payment_date}</TableCell>
+                        <TableCell className="text-center">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => removeDividend(d.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );
