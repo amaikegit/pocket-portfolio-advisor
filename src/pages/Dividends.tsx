@@ -349,6 +349,79 @@ const Dividends = () => {
           </Card>
         )}
 
+        {/* Month-over-Month Comparison Chart */}
+        {dividends.length > 0 && (() => {
+          // Build chronological month list from dividends
+          const monthTotals: Record<string, number> = {};
+          dividends.forEach((d) => {
+            const key = `${d.year}-${String(d.month).padStart(2, "0")}`;
+            monthTotals[key] = (monthTotals[key] || 0) + d.amount;
+          });
+          const sortedKeys = Object.keys(monthTotals).sort();
+          const compData = sortedKeys.map((key, idx) => {
+            const current = monthTotals[key];
+            const prev = idx > 0 ? monthTotals[sortedKeys[idx - 1]] : 0;
+            const [y, m] = key.split("-");
+            const diff = idx > 0 ? current - prev : 0;
+            const diffPct = idx > 0 && prev > 0 ? ((current - prev) / prev) * 100 : 0;
+            return {
+              label: `${MONTH_NAMES[parseInt(m) - 1]}/${y.slice(2)}`,
+              atual: current,
+              anterior: prev,
+              diff,
+              diffPct: parseFloat(diffPct.toFixed(1)),
+            };
+          });
+
+          return (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-mono flex items-center gap-2">
+                  <ArrowUpDown className="h-4 w-4" />
+                  Comparativo Mês a Mês
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{
+                    atual: { label: "Mês Atual", color: "hsl(142, 60%, 45%)" },
+                    anterior: { label: "Mês Anterior", color: "hsl(215, 15%, 50%)" },
+                  }}
+                  className="h-[300px] w-full"
+                >
+                  <BarChart data={compData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="label" className="text-xs" angle={-45} textAnchor="end" height={50} />
+                    <YAxis className="text-xs" tickFormatter={(v) => `R$${v}`} />
+                    <ChartTooltip
+                      content={
+                        <ChartTooltipContent
+                          formatter={(value, name) => {
+                            if (name === "atual") return formatBRL(Number(value));
+                            if (name === "anterior") return formatBRL(Number(value));
+                            return String(value);
+                          }}
+                          labelFormatter={(label, payload) => {
+                            if (payload?.[0]?.payload) {
+                              const p = payload[0].payload;
+                              const sign = p.diff >= 0 ? "+" : "";
+                              return `${label} (${sign}${formatBRL(p.diff)} / ${sign}${p.diffPct}%)`;
+                            }
+                            return label;
+                          }}
+                        />
+                      }
+                    />
+                    <Legend />
+                    <Bar dataKey="anterior" name="Mês Anterior" fill="hsl(215, 15%, 50%)" radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="atual" name="Mês Atual" fill="hsl(142, 60%, 45%)" radius={[2, 2, 0, 0]} />
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          );
+        })()}
+
         {/* Monthly Table */}
         <Card>
           <CardHeader className="pb-2">
