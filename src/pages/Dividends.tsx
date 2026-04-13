@@ -12,8 +12,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Checkbox } from "@/components/ui/checkbox";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, ReferenceLine, Legend } from "recharts";
-import { BarChart3, Plus, ArrowLeft, LogOut, DollarSign, TrendingUp, Calendar, Loader2, Trash2, Pencil, Filter, ArrowUpDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, Legend } from "recharts";
+import { BarChart3, Plus, ArrowLeft, LogOut, DollarSign, TrendingUp, Calendar, Loader2, Trash2, Pencil, Filter, ArrowUpDown, ChevronDown, ChevronRight } from "lucide-react";
+
+import { AccumulatedDividendsChart } from "@/components/dividends/AccumulatedDividendsChart";
+import { AssetDividendEvolution } from "@/components/dividends/AssetDividendEvolution";
+import { DividendAnalytics } from "@/components/dividends/DividendAnalytics";
+import { InvestmentCalculator } from "@/components/dividends/InvestmentCalculator";
 
 const MONTH_NAMES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
@@ -25,7 +31,7 @@ const Dividends = () => {
     dividends, loading, addDividend, updateDividend, bulkImportDividends, removeDividend, bulkRemoveDividends,
     years, monthlyByYear, totalByYear, totalAll, averageMonthly,
   } = useDividends();
-  const { assets } = usePortfolio();
+  const { assets, calculatedAssets } = usePortfolio();
   const { signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -35,6 +41,7 @@ const Dividends = () => {
   const [form, setForm] = useState({ ticker: "", amount: "", month: "", year: "", date: "" });
   const [filterYear, setFilterYear] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [recordsOpen, setRecordsOpen] = useState(false);
 
   const currentYear = new Date().getFullYear();
   const existingTickers = assets.map((a) => a.ticker);
@@ -132,6 +139,34 @@ const Dividends = () => {
     chartConfig[y] = { label: y.toString(), color: colors[i % colors.length] };
   });
 
+  // Comparison: current year only
+  const compData = (() => {
+    const monthTotals: Record<string, number> = {};
+    dividends.forEach((d) => {
+      const key = `${d.year}-${String(d.month).padStart(2, "0")}`;
+      monthTotals[key] = (monthTotals[key] || 0) + d.amount;
+    });
+
+    return MONTH_NAMES.map((name, i) => {
+      const monthNum = i + 1;
+      const keyCurrent = `${currentYear}-${String(monthNum).padStart(2, "0")}`;
+      const keyPrev = monthNum === 1
+        ? `${currentYear - 1}-12`
+        : `${currentYear}-${String(monthNum - 1).padStart(2, "0")}`;
+      const atual = monthTotals[keyCurrent] || 0;
+      const anterior = monthTotals[keyPrev] || 0;
+      const diff = atual - anterior;
+      const diffPct = anterior > 0 ? ((atual - anterior) / anterior) * 100 : 0;
+      return {
+        label: name,
+        atual,
+        anterior,
+        diff: parseFloat(diff.toFixed(2)),
+        diffPct: parseFloat(diffPct.toFixed(1)),
+      };
+    }).filter((d) => d.atual > 0 || d.anterior > 0);
+  })();
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -140,7 +175,6 @@ const Dividends = () => {
     );
   }
 
-  // Shared form fields component
   const FormFields = () => (
     <div className="space-y-3 pt-2">
       <div>
@@ -279,7 +313,7 @@ const Dividends = () => {
           </Card>
         </div>
 
-        {/* Charts */}
+        {/* Charts Row 1 */}
         <div className="grid lg:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
@@ -317,6 +351,9 @@ const Dividends = () => {
           </Card>
         </div>
 
+        {/* Accumulated Chart */}
+        <AccumulatedDividendsChart dividends={dividends} />
+
         {/* Pie Chart */}
         {pieData.length > 0 && (
           <Card>
@@ -349,78 +386,56 @@ const Dividends = () => {
           </Card>
         )}
 
-        {/* Month-over-Month Comparison Chart */}
-        {dividends.length > 0 && (() => {
-          // Build chronological month list from dividends
-          const monthTotals: Record<string, number> = {};
-          dividends.forEach((d) => {
-            const key = `${d.year}-${String(d.month).padStart(2, "0")}`;
-            monthTotals[key] = (monthTotals[key] || 0) + d.amount;
-          });
-          const sortedKeys = Object.keys(monthTotals).sort();
-          const compData = sortedKeys.map((key, idx) => {
-            const current = monthTotals[key];
-            const prev = idx > 0 ? monthTotals[sortedKeys[idx - 1]] : 0;
-            const [y, m] = key.split("-");
-            const diff = idx > 0 ? current - prev : 0;
-            const diffPct = idx > 0 && prev > 0 ? ((current - prev) / prev) * 100 : 0;
-            return {
-              label: `${MONTH_NAMES[parseInt(m) - 1]}/${y.slice(2)}`,
-              atual: current,
-              anterior: prev,
-              diff,
-              diffPct: parseFloat(diffPct.toFixed(1)),
-            };
-          });
+        {/* Comparison - Current Year */}
+        {compData.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-mono flex items-center gap-2">
+                <ArrowUpDown className="h-4 w-4" />
+                Comparativo Mês a Mês — {currentYear}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={{
+                  atual: { label: "Mês Atual", color: "hsl(142, 60%, 45%)" },
+                  anterior: { label: "Mês Anterior", color: "hsl(215, 15%, 50%)" },
+                }}
+                className="h-[300px] w-full"
+              >
+                <BarChart data={compData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" className="text-xs" />
+                  <YAxis className="text-xs" tickFormatter={(v) => `R$${v}`} />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        formatter={(value, name) => formatBRL(Number(value))}
+                        labelFormatter={(label, payload) => {
+                          if (payload?.[0]?.payload) {
+                            const p = payload[0].payload;
+                            const sign = p.diff >= 0 ? "+" : "";
+                            return `${label} (${sign}${formatBRL(p.diff)} / ${sign}${p.diffPct}%)`;
+                          }
+                          return label;
+                        }}
+                      />
+                    }
+                  />
+                  <Legend />
+                  <Bar dataKey="anterior" name="Mês Anterior" fill="hsl(215, 15%, 50%)" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="atual" name="Mês Atual" fill="hsl(142, 60%, 45%)" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        )}
 
-          return (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-mono flex items-center gap-2">
-                  <ArrowUpDown className="h-4 w-4" />
-                  Comparativo Mês a Mês
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    atual: { label: "Mês Atual", color: "hsl(142, 60%, 45%)" },
-                    anterior: { label: "Mês Anterior", color: "hsl(215, 15%, 50%)" },
-                  }}
-                  className="h-[300px] w-full"
-                >
-                  <BarChart data={compData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="label" className="text-xs" angle={-45} textAnchor="end" height={50} />
-                    <YAxis className="text-xs" tickFormatter={(v) => `R$${v}`} />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          formatter={(value, name) => {
-                            if (name === "atual") return formatBRL(Number(value));
-                            if (name === "anterior") return formatBRL(Number(value));
-                            return String(value);
-                          }}
-                          labelFormatter={(label, payload) => {
-                            if (payload?.[0]?.payload) {
-                              const p = payload[0].payload;
-                              const sign = p.diff >= 0 ? "+" : "";
-                              return `${label} (${sign}${formatBRL(p.diff)} / ${sign}${p.diffPct}%)`;
-                            }
-                            return label;
-                          }}
-                        />
-                      }
-                    />
-                    <Legend />
-                    <Bar dataKey="anterior" name="Mês Anterior" fill="hsl(215, 15%, 50%)" radius={[2, 2, 0, 0]} />
-                    <Bar dataKey="atual" name="Mês Atual" fill="hsl(142, 60%, 45%)" radius={[2, 2, 0, 0]} />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-          );
-        })()}
+        {/* Per-asset evolution */}
+        <AssetDividendEvolution dividends={dividends} />
+
+        {/* Analytics */}
+        <DividendAnalytics dividends={dividends} assets={calculatedAssets} />
 
         {/* Monthly Table */}
         <Card>
@@ -466,85 +481,97 @@ const Dividends = () => {
           </CardContent>
         </Card>
 
-        {/* Individual Records with filter, multi-select, edit, delete */}
+        {/* Collapsible Individual Records */}
         {dividends.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <CardTitle className="text-sm font-mono uppercase">Registros Individuais</CardTitle>
-                <div className="flex items-center gap-2">
-                  {selectedIds.size > 0 && (
-                    <Button variant="destructive" size="sm" className="gap-1.5" onClick={handleBulkDelete}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Excluir {selectedIds.size}
-                    </Button>
-                  )}
-                  <div className="flex items-center gap-1.5">
-                    <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-                    <Select value={filterYear} onValueChange={(v) => { setFilterYear(v); setSelectedIds(new Set()); }}>
-                      <SelectTrigger className="h-8 w-[100px] text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {years.map((y) => (
-                          <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+          <Collapsible open={recordsOpen} onOpenChange={setRecordsOpen}>
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CollapsibleTrigger asChild>
+                    <button className="flex items-center gap-2 text-sm font-mono uppercase hover:text-primary transition-colors">
+                      {recordsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      Registros Individuais ({filteredDividends.length})
+                    </button>
+                  </CollapsibleTrigger>
+                  <div className="flex items-center gap-2">
+                    {selectedIds.size > 0 && (
+                      <Button variant="destructive" size="sm" className="gap-1.5" onClick={handleBulkDelete}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Excluir {selectedIds.size}
+                      </Button>
+                    )}
+                    <div className="flex items-center gap-1.5">
+                      <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                      <Select value={filterYear} onValueChange={(v) => { setFilterYear(v); setSelectedIds(new Set()); }}>
+                        <SelectTrigger className="h-8 w-[100px] text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          {years.map((y) => (
+                            <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-auto max-h-[400px]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10 text-center">
-                        <Checkbox
-                          checked={sortedDividends.length > 0 && selectedIds.size === sortedDividends.length}
-                          onCheckedChange={toggleSelectAll}
-                        />
-                      </TableHead>
-                      <TableHead className="font-mono text-xs">Ticker</TableHead>
-                      <TableHead className="font-mono text-xs text-right">Valor</TableHead>
-                      <TableHead className="font-mono text-xs text-center">Mês/Ano</TableHead>
-                      <TableHead className="font-mono text-xs text-center">Data Pgto</TableHead>
-                      <TableHead className="font-mono text-xs text-center w-20">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedDividends.map((d) => (
-                      <TableRow key={d.id} className={selectedIds.has(d.id) ? "bg-muted/50" : ""}>
-                        <TableCell className="text-center">
-                          <Checkbox
-                            checked={selectedIds.has(d.id)}
-                            onCheckedChange={() => toggleSelect(d.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="font-mono text-xs font-medium">{d.ticker}</TableCell>
-                        <TableCell className="font-mono text-xs text-right text-primary">{formatBRL(d.amount)}</TableCell>
-                        <TableCell className="font-mono text-xs text-center">{MONTH_NAMES[d.month - 1]?.toUpperCase()}/{d.year}</TableCell>
-                        <TableCell className="font-mono text-xs text-center text-muted-foreground">{d.payment_date}</TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-0.5">
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => handleEditOpen(d)}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => removeDividend(d.id)}>
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent className="p-0">
+                  <div className="overflow-auto max-h-[400px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-10 text-center">
+                            <Checkbox
+                              checked={sortedDividends.length > 0 && selectedIds.size === sortedDividends.length}
+                              onCheckedChange={toggleSelectAll}
+                            />
+                          </TableHead>
+                          <TableHead className="font-mono text-xs">Ticker</TableHead>
+                          <TableHead className="font-mono text-xs text-right">Valor</TableHead>
+                          <TableHead className="font-mono text-xs text-center">Mês/Ano</TableHead>
+                          <TableHead className="font-mono text-xs text-center">Data Pgto</TableHead>
+                          <TableHead className="font-mono text-xs text-center w-20">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sortedDividends.map((d) => (
+                          <TableRow key={d.id} className={selectedIds.has(d.id) ? "bg-muted/50" : ""}>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={selectedIds.has(d.id)}
+                                onCheckedChange={() => toggleSelect(d.id)}
+                              />
+                            </TableCell>
+                            <TableCell className="font-mono text-xs font-medium">{d.ticker}</TableCell>
+                            <TableCell className="font-mono text-xs text-right text-primary">{formatBRL(d.amount)}</TableCell>
+                            <TableCell className="font-mono text-xs text-center">{MONTH_NAMES[d.month - 1]?.toUpperCase()}/{d.year}</TableCell>
+                            <TableCell className="font-mono text-xs text-center text-muted-foreground">{d.payment_date}</TableCell>
+                            <TableCell className="text-center">
+                              <div className="flex items-center justify-center gap-0.5">
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => handleEditOpen(d)}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => removeDividend(d.id)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         )}
+
+        {/* Investment Calculator */}
+        <InvestmentCalculator />
       </main>
     </div>
   );
