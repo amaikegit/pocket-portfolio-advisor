@@ -252,7 +252,7 @@ const Dividends = () => {
                 <DialogHeader>
                   <DialogTitle>Registrar Dividendo</DialogTitle>
                 </DialogHeader>
-                <FormFields />
+                {formFieldsJSX}
                 <Button className="w-full" onClick={handleAdd}>Salvar</Button>
               </DialogContent>
             </Dialog>
@@ -269,7 +269,7 @@ const Dividends = () => {
           <DialogHeader>
             <DialogTitle>Editar Dividendo</DialogTitle>
           </DialogHeader>
-          <FormFields />
+          {formFieldsJSX}
           <Button className="w-full" onClick={handleEditSave}>Atualizar</Button>
         </DialogContent>
       </Dialog>
