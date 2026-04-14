@@ -42,6 +42,7 @@ const Dividends = () => {
   const [filterYear, setFilterYear] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [recordsOpen, setRecordsOpen] = useState(false);
+  const [paidTableOpen, setPaidTableOpen] = useState(false);
 
   const currentYear = new Date().getFullYear();
   const existingTickers = assets.map((a) => a.ticker);
@@ -437,49 +438,58 @@ const Dividends = () => {
         {/* Analytics */}
         <DividendAnalytics dividends={dividends} assets={calculatedAssets} />
 
-        {/* Monthly Table */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-mono uppercase">Dividendos Pagos</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="font-mono text-xs sticky left-0 bg-card z-10">Mês</TableHead>
-                    {displayYears.map((y) => (
-                      <TableHead key={y} className="font-mono text-xs text-right">{y}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {MONTH_NAMES.map((m, i) => (
-                    <TableRow key={m}>
-                      <TableCell className="font-mono text-xs sticky left-0 bg-card z-10">{m}</TableCell>
-                      {displayYears.map((y) => {
-                        const val = grid[y]?.[i + 1];
-                        return (
-                          <TableCell key={y} className="font-mono text-xs text-right">
-                            {val ? formatBRL(val) : ""}
+        {/* Monthly Table - Collapsible */}
+        <Collapsible open={paidTableOpen} onOpenChange={setPaidTableOpen}>
+          <Card>
+            <CardHeader className="pb-2">
+              <CollapsibleTrigger asChild>
+                <button className="flex items-center gap-2 text-sm font-mono uppercase hover:text-primary transition-colors">
+                  {paidTableOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  Dividendos Pagos
+                </button>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="p-0">
+                <div className="overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="font-mono text-xs sticky left-0 bg-card z-10">Mês</TableHead>
+                        {displayYears.map((y) => (
+                          <TableHead key={y} className="font-mono text-xs text-right">{y}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {MONTH_NAMES.map((m, i) => (
+                        <TableRow key={m}>
+                          <TableCell className="font-mono text-xs sticky left-0 bg-card z-10">{m}</TableCell>
+                          {displayYears.map((y) => {
+                            const val = grid[y]?.[i + 1];
+                            return (
+                              <TableCell key={y} className="font-mono text-xs text-right">
+                                {val ? formatBRL(val) : ""}
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      ))}
+                      <TableRow className="border-t-2 border-primary/30 font-bold">
+                        <TableCell className="font-mono text-xs sticky left-0 bg-card z-10">Total</TableCell>
+                        {displayYears.map((y) => (
+                          <TableCell key={y} className="font-mono text-xs text-right text-primary font-bold">
+                            {formatBRL(totalByYear(y))}
                           </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  ))}
-                  <TableRow className="border-t-2 border-primary/30 font-bold">
-                    <TableCell className="font-mono text-xs sticky left-0 bg-card z-10">Total</TableCell>
-                    {displayYears.map((y) => (
-                      <TableCell key={y} className="font-mono text-xs text-right text-primary font-bold">
-                        {formatBRL(totalByYear(y))}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                        ))}
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Collapsible Individual Records */}
         {dividends.length > 0 && (
@@ -571,7 +581,14 @@ const Dividends = () => {
         )}
 
         {/* Investment Calculator */}
-        <InvestmentCalculator />
+        <InvestmentCalculator
+          defaultInitial={calculatedAssets.reduce((s, a) => s + a.totalCurrent, 0)}
+          defaultRate={(() => {
+            const totalCurrent = calculatedAssets.reduce((s, a) => s + a.totalCurrent, 0);
+            const totalMonthlyDY = assets.reduce((s, a) => s + (a.dividendYield * a.quantity), 0);
+            return totalCurrent > 0 ? (totalMonthlyDY / totalCurrent) * 100 * 12 : 0;
+          })()}
+        />
       </main>
     </div>
   );
