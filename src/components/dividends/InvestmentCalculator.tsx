@@ -1,52 +1,44 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Calculator, DollarSign, TrendingUp, Percent } from "lucide-react";
 
 const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-export function InvestmentCalculator() {
+interface Props {
+  defaultInitial?: number;
+  defaultRate?: number;
+}
+
+export function InvestmentCalculator({ defaultInitial = 0, defaultRate = 0 }: Props) {
   const [initial, setInitial] = useState("");
   const [rate, setRate] = useState("");
   const [monthly, setMonthly] = useState("");
   const [months, setMonths] = useState("");
-  const [result, setResult] = useState<{
-    investimentoInicial: number;
-    investimentoContinuo: number;
-    jurosObtidos: number;
-    valorFinal: number;
-  } | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
-  const calculate = () => {
+  // Set defaults from portfolio once available
+  useEffect(() => {
+    if (!initialized && defaultInitial > 0) {
+      setInitial(defaultInitial.toFixed(2).replace(".", ","));
+      setRate(defaultRate.toFixed(2).replace(".", ","));
+      setInitialized(true);
+    }
+  }, [defaultInitial, defaultRate, initialized]);
+
+  const result = useMemo(() => {
     const PV = parseFloat(initial.replace(",", ".")) || 0;
     const annualRate = (parseFloat(rate.replace(",", ".")) || 0) / 100;
     const PMT = parseFloat(monthly.replace(",", ".")) || 0;
     const nMonths = parseInt(months) || 0;
 
-    if (nMonths <= 0) return;
+    if (nMonths <= 0) return null;
 
-    // Monthly rate
     const monthlyRate = annualRate / 12;
-
-    // FV = FV(rate_annual, years, 0, -PV) + FV(rate_monthly, months, -PMT, 0, 0)
-    // FV of lump sum: PV * (1 + annual_rate)^years
-    // FV of annuity: PMT * (((1 + monthly_rate)^months - 1) / monthly_rate)
-    // Using the exact Excel FV formula from user:
-    // =FV(AF12;AF13;0;-AD12) + FV(AF12/AD14;AF13*AD14;-AD13;0;0)
-    // AF12 = annual rate, AF13 = years (duration), AD12 = initial, AD14 = 12 (compound months), AD13 = monthly PMT
-    // FV(rate, nper, pmt, pv, type)
-    // FV(annualRate, years, 0, -PV) => PV * (1 + annualRate)^years
-    // FV(annualRate/12, years*12, -PMT, 0, 0) => PMT * (((1+monthlyRate)^(years*12) - 1) / monthlyRate)
-
     const years = nMonths / 12;
-    
-    // FV of initial investment compounded annually then broken to match user formula
-    // FV(rate, nper, pmt, pv) = -pv*(1+rate)^nper - pmt*(((1+rate)^nper - 1)/rate)
-    // First part: FV(annualRate, years, 0, -PV) = PV * (1 + annualRate)^years
+
     const fvInitial = PV * Math.pow(1 + annualRate, years);
 
-    // Second part: FV(monthlyRate, nMonths, -PMT, 0, 0) = PMT * (((1+monthlyRate)^nMonths - 1) / monthlyRate)
     let fvContinuous = 0;
     if (monthlyRate > 0) {
       fvContinuous = PMT * ((Math.pow(1 + monthlyRate, nMonths) - 1) / monthlyRate);
@@ -58,13 +50,13 @@ export function InvestmentCalculator() {
     const investimentoContinuo = PMT * nMonths;
     const jurosObtidos = valorFinal - PV - investimentoContinuo;
 
-    setResult({
+    return {
       investimentoInicial: PV,
       investimentoContinuo,
       jurosObtidos,
       valorFinal,
-    });
-  };
+    };
+  }, [initial, rate, monthly, months]);
 
   return (
     <Card>
@@ -113,10 +105,6 @@ export function InvestmentCalculator() {
             />
           </div>
         </div>
-        <Button onClick={calculate} className="gap-2 mb-4">
-          <Calculator className="h-4 w-4" />
-          Calcular
-        </Button>
 
         {result && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
