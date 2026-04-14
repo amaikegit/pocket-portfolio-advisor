@@ -177,7 +177,7 @@ const Dividends = () => {
     );
   }
 
-  const FormFields = () => (
+  const formFieldsJSX = (
     <div className="space-y-3 pt-2">
       <div>
         <label className="text-sm text-muted-foreground">Ticker</label>
