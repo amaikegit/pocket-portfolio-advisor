@@ -20,6 +20,7 @@ import { AccumulatedDividendsChart } from "@/components/dividends/AccumulatedDiv
 import { AssetDividendEvolution } from "@/components/dividends/AssetDividendEvolution";
 import { DividendAnalytics } from "@/components/dividends/DividendAnalytics";
 import { InvestmentCalculator } from "@/components/dividends/InvestmentCalculator";
+import { MonthlyGoal } from "@/components/dividends/MonthlyGoal";
 
 const MONTH_NAMES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
@@ -275,44 +276,53 @@ const Dividends = () => {
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-6">
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <Card>
-            <CardContent className="pt-4 pb-3 px-4">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                <DollarSign className="h-3.5 w-3.5" />
-                Total Recebido
-              </div>
-              <p className="text-lg sm:text-xl font-mono font-bold text-primary">{formatBRL(totalAll)}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-3 px-4">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                <TrendingUp className="h-3.5 w-3.5" />
-                Média Mensal
-              </div>
-              <p className="text-lg sm:text-xl font-mono font-bold">{formatBRL(averageMonthly())}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-3 px-4">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                <Calendar className="h-3.5 w-3.5" />
-                Ano Atual ({currentYear})
-              </div>
-              <p className="text-lg sm:text-xl font-mono font-bold">{formatBRL(totalByYear(currentYear))}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-3 px-4">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
-                <BarChart3 className="h-3.5 w-3.5" />
-                Ativos Pagando
-              </div>
-              <p className="text-lg sm:text-xl font-mono font-bold">{new Set(dividends.map((d) => d.ticker)).size}</p>
-            </CardContent>
-          </Card>
-        </div>
+        {(() => {
+          const currentMonth = new Date().getMonth() + 1;
+          const currentMonthTotal = dividends
+            .filter((d) => d.year === currentYear && d.month === currentMonth)
+            .reduce((s, d) => s + d.amount, 0);
+          return (
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+              <Card>
+                <CardContent className="pt-4 pb-3 px-4">
+                  <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                    <DollarSign className="h-3.5 w-3.5" />
+                    Total Recebido
+                  </div>
+                  <p className="text-lg sm:text-xl font-mono font-bold text-primary">{formatBRL(totalAll)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4 pb-3 px-4">
+                  <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    Média Mensal
+                  </div>
+                  <p className="text-lg sm:text-xl font-mono font-bold">{formatBRL(averageMonthly())}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4 pb-3 px-4">
+                  <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                    <Calendar className="h-3.5 w-3.5" />
+                    Ano Atual ({currentYear})
+                  </div>
+                  <p className="text-lg sm:text-xl font-mono font-bold">{formatBRL(totalByYear(currentYear))}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4 pb-3 px-4">
+                  <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+                    <BarChart3 className="h-3.5 w-3.5" />
+                    Ativos Pagando
+                  </div>
+                  <p className="text-lg sm:text-xl font-mono font-bold">{new Set(dividends.map((d) => d.ticker)).size}</p>
+                </CardContent>
+              </Card>
+              <MonthlyGoal currentMonthTotal={currentMonthTotal} />
+            </div>
+          );
+        })()}
 
         {/* Charts Row 1 */}
         <div className="grid lg:grid-cols-2 gap-4">
