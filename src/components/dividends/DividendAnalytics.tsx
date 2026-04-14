@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Dividend } from "@/hooks/useDividends";
 import { AssetCalculated } from "@/types/portfolio";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Target, Trophy, Percent } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Target, Trophy, Percent, ChevronDown, ChevronRight } from "lucide-react";
 
 const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -12,9 +14,10 @@ interface Props {
 }
 
 export function DividendAnalytics({ dividends, assets }: Props) {
+  const [tableOpen, setTableOpen] = useState(false);
+
   if (dividends.length === 0 || assets.length === 0) return null;
 
-  // Yield on Cost per asset
   const dividendByTicker: Record<string, number> = {};
   dividends.forEach((d) => {
     dividendByTicker[d.ticker] = (dividendByTicker[d.ticker] || 0) + d.amount;
@@ -61,7 +64,6 @@ export function DividendAnalytics({ dividends, assets }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Summary analytics cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card>
           <CardContent className="pt-4 pb-3 px-4">
@@ -104,44 +106,52 @@ export function DividendAnalytics({ dividends, assets }: Props) {
         </Card>
       </div>
 
-      {/* Detailed table */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-mono">Análise por Ativo (Dividendos × Carteira)</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="font-mono text-xs">Ticker</TableHead>
-                  <TableHead className="font-mono text-xs text-right">Investido</TableHead>
-                  <TableHead className="font-mono text-xs text-right">Div. Total</TableHead>
-                  <TableHead className="font-mono text-xs text-right">Div. {currentYear}</TableHead>
-                  <TableHead className="font-mono text-xs text-right">YoC Total</TableHead>
-                  <TableHead className="font-mono text-xs text-right">YoC {currentYear}</TableHead>
-                  <TableHead className="font-mono text-xs text-right">Média/Mês</TableHead>
-                  <TableHead className="font-mono text-xs text-center">Meses</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {analyticsData.map((a) => (
-                  <TableRow key={a.ticker}>
-                    <TableCell className="font-mono text-xs font-medium">{a.ticker}</TableCell>
-                    <TableCell className="font-mono text-xs text-right">{formatBRL(a.invested)}</TableCell>
-                    <TableCell className="font-mono text-xs text-right text-primary">{formatBRL(a.totalDiv)}</TableCell>
-                    <TableCell className="font-mono text-xs text-right">{formatBRL(a.divYear)}</TableCell>
-                    <TableCell className="font-mono text-xs text-right font-medium">{a.yieldOnCost}%</TableCell>
-                    <TableCell className="font-mono text-xs text-right">{a.yieldOnCostYear}%</TableCell>
-                    <TableCell className="font-mono text-xs text-right">{formatBRL(a.avgMonthly)}</TableCell>
-                    <TableCell className="font-mono text-xs text-center">{a.monthsReceived}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      <Collapsible open={tableOpen} onOpenChange={setTableOpen}>
+        <Card>
+          <CardHeader className="pb-2">
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center gap-2 text-sm font-mono uppercase hover:text-primary transition-colors">
+                {tableOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                Análise por Ativo (Dividendos × Carteira)
+              </button>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="p-0">
+              <div className="overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="font-mono text-xs">Ticker</TableHead>
+                      <TableHead className="font-mono text-xs text-right">Investido</TableHead>
+                      <TableHead className="font-mono text-xs text-right">Div. Total</TableHead>
+                      <TableHead className="font-mono text-xs text-right">Div. {currentYear}</TableHead>
+                      <TableHead className="font-mono text-xs text-right">YoC Total</TableHead>
+                      <TableHead className="font-mono text-xs text-right">YoC {currentYear}</TableHead>
+                      <TableHead className="font-mono text-xs text-right">Média/Mês</TableHead>
+                      <TableHead className="font-mono text-xs text-center">Meses</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {analyticsData.map((a) => (
+                      <TableRow key={a.ticker}>
+                        <TableCell className="font-mono text-xs font-medium">{a.ticker}</TableCell>
+                        <TableCell className="font-mono text-xs text-right">{formatBRL(a.invested)}</TableCell>
+                        <TableCell className="font-mono text-xs text-right text-primary">{formatBRL(a.totalDiv)}</TableCell>
+                        <TableCell className="font-mono text-xs text-right">{formatBRL(a.divYear)}</TableCell>
+                        <TableCell className="font-mono text-xs text-right font-medium">{a.yieldOnCost}%</TableCell>
+                        <TableCell className="font-mono text-xs text-right">{a.yieldOnCostYear}%</TableCell>
+                        <TableCell className="font-mono text-xs text-right">{formatBRL(a.avgMonthly)}</TableCell>
+                        <TableCell className="font-mono text-xs text-center">{a.monthsReceived}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
     </div>
   );
 }
