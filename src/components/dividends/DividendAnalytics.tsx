@@ -43,6 +43,21 @@ export function DividendAnalytics({ dividends, assets }: Props) {
       ).size;
       const avgMonthly = monthsReceived > 0 ? totalDiv / monthsReceived : 0;
 
+      // Detect frequency
+      const tickerDivs = dividends.filter((d) => d.ticker === a.ticker);
+      const monthSet = tickerDivs.map((d) => d.year * 12 + d.month).sort((a, b) => a - b);
+      let frequency = "-";
+      if (monthSet.length >= 2) {
+        const gaps: number[] = [];
+        for (let i = 1; i < monthSet.length; i++) gaps.push(monthSet[i] - monthSet[i - 1]);
+        const avgGap = gaps.reduce((s, g) => s + g, 0) / gaps.length;
+        if (avgGap <= 1.5) frequency = "Mensal";
+        else if (avgGap <= 2.5) frequency = "Bimestral";
+        else if (avgGap <= 3.5) frequency = "Trimestral";
+        else if (avgGap <= 6.5) frequency = "Semestral";
+        else frequency = "Anual";
+      }
+
       return {
         ticker: a.ticker,
         totalDiv,
@@ -53,6 +68,7 @@ export function DividendAnalytics({ dividends, assets }: Props) {
         yieldOnCostYear: parseFloat(yieldOnCostYear.toFixed(2)),
         avgMonthly: parseFloat(avgMonthly.toFixed(2)),
         monthsReceived,
+        frequency,
       };
     })
     .sort((a, b) => b.yieldOnCost - a.yieldOnCost);
