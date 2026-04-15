@@ -43,6 +43,21 @@ export function DividendAnalytics({ dividends, assets }: Props) {
       ).size;
       const avgMonthly = monthsReceived > 0 ? totalDiv / monthsReceived : 0;
 
+      // Detect frequency
+      const tickerDivs = dividends.filter((d) => d.ticker === a.ticker);
+      const monthSet = tickerDivs.map((d) => d.year * 12 + d.month).sort((a, b) => a - b);
+      let frequency = "-";
+      if (monthSet.length >= 2) {
+        const gaps: number[] = [];
+        for (let i = 1; i < monthSet.length; i++) gaps.push(monthSet[i] - monthSet[i - 1]);
+        const avgGap = gaps.reduce((s, g) => s + g, 0) / gaps.length;
+        if (avgGap <= 1.5) frequency = "Mensal";
+        else if (avgGap <= 2.5) frequency = "Bimestral";
+        else if (avgGap <= 3.5) frequency = "Trimestral";
+        else if (avgGap <= 6.5) frequency = "Semestral";
+        else frequency = "Anual";
+      }
+
       return {
         ticker: a.ticker,
         totalDiv,
@@ -53,6 +68,7 @@ export function DividendAnalytics({ dividends, assets }: Props) {
         yieldOnCostYear: parseFloat(yieldOnCostYear.toFixed(2)),
         avgMonthly: parseFloat(avgMonthly.toFixed(2)),
         monthsReceived,
+        frequency,
       };
     })
     .sort((a, b) => b.yieldOnCost - a.yieldOnCost);
@@ -129,22 +145,24 @@ export function DividendAnalytics({ dividends, assets }: Props) {
                       <TableHead className="font-mono text-xs text-right">YoC Total</TableHead>
                       <TableHead className="font-mono text-xs text-right">YoC {currentYear}</TableHead>
                       <TableHead className="font-mono text-xs text-right">Média/Mês</TableHead>
-                      <TableHead className="font-mono text-xs text-center">Meses</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {analyticsData.map((a) => (
-                      <TableRow key={a.ticker}>
-                        <TableCell className="font-mono text-xs font-medium">{a.ticker}</TableCell>
-                        <TableCell className="font-mono text-xs text-right">{formatBRL(a.invested)}</TableCell>
-                        <TableCell className="font-mono text-xs text-right text-primary">{formatBRL(a.totalDiv)}</TableCell>
-                        <TableCell className="font-mono text-xs text-right">{formatBRL(a.divYear)}</TableCell>
-                        <TableCell className="font-mono text-xs text-right font-medium">{a.yieldOnCost}%</TableCell>
-                        <TableCell className="font-mono text-xs text-right">{a.yieldOnCostYear}%</TableCell>
-                        <TableCell className="font-mono text-xs text-right">{formatBRL(a.avgMonthly)}</TableCell>
-                        <TableCell className="font-mono text-xs text-center">{a.monthsReceived}</TableCell>
-                      </TableRow>
-                    ))}
+                       <TableHead className="font-mono text-xs text-center">Meses</TableHead>
+                       <TableHead className="font-mono text-xs text-center">Frequência</TableHead>
+                     </TableRow>
+                   </TableHeader>
+                   <TableBody>
+                     {analyticsData.map((a) => (
+                       <TableRow key={a.ticker}>
+                         <TableCell className="font-mono text-xs font-medium">{a.ticker}</TableCell>
+                         <TableCell className="font-mono text-xs text-right">{formatBRL(a.invested)}</TableCell>
+                         <TableCell className="font-mono text-xs text-right text-primary">{formatBRL(a.totalDiv)}</TableCell>
+                         <TableCell className="font-mono text-xs text-right">{formatBRL(a.divYear)}</TableCell>
+                         <TableCell className="font-mono text-xs text-right font-medium">{a.yieldOnCost}%</TableCell>
+                         <TableCell className="font-mono text-xs text-right">{a.yieldOnCostYear}%</TableCell>
+                         <TableCell className="font-mono text-xs text-right">{formatBRL(a.avgMonthly)}</TableCell>
+                         <TableCell className="font-mono text-xs text-center">{a.monthsReceived}</TableCell>
+                         <TableCell className="font-mono text-xs text-center">{a.frequency}</TableCell>
+                       </TableRow>
+                     ))}
                   </TableBody>
                 </Table>
               </div>
