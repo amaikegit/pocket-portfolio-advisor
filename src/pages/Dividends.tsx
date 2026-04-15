@@ -465,6 +465,9 @@ const Dividends = () => {
         {/* Analytics */}
         <DividendAnalytics dividends={dividends} assets={calculatedAssets} />
 
+        {/* Projections */}
+        <DividendProjections dividends={dividends} assets={calculatedAssets} rawAssets={assets} />
+
         {/* Monthly Table - Collapsible */}
         <Collapsible open={paidTableOpen} onOpenChange={setPaidTableOpen}>
           <Card>
