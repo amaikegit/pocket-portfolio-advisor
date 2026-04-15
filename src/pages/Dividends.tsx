@@ -21,6 +21,7 @@ import { AssetDividendEvolution } from "@/components/dividends/AssetDividendEvol
 import { DividendAnalytics } from "@/components/dividends/DividendAnalytics";
 import { InvestmentCalculator } from "@/components/dividends/InvestmentCalculator";
 import { MonthlyGoal } from "@/components/dividends/MonthlyGoal";
+import { DividendProjections } from "@/components/dividends/DividendProjections";
 
 const MONTH_NAMES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
@@ -46,9 +47,22 @@ const Dividends = () => {
   const [paidTableOpen, setPaidTableOpen] = useState(false);
 
   const currentYear = new Date().getFullYear();
-  const existingTickers = assets.map((a) => a.ticker);
+  const existingTickers = assets.map((a) => a.ticker).sort();
 
-  const resetForm = () => setForm({ ticker: "", amount: "", month: "", year: "", date: "" });
+  const resetForm = () => setForm({
+    ticker: "",
+    amount: "",
+    month: (new Date().getMonth() + 1).toString(),
+    year: new Date().getFullYear().toString(),
+    date: new Date().toISOString().slice(0, 10),
+  });
+
+  // Last dividend amount per ticker for hint
+  const lastDividendByTicker = (ticker: string): number | null => {
+    const tickerDivs = dividends.filter((d) => d.ticker === ticker).sort((a, b) => b.year - a.year || b.month - a.month);
+    return tickerDivs.length > 0 ? tickerDivs[0].amount : null;
+  };
+  const lastAmountHint = form.ticker ? lastDividendByTicker(form.ticker) : null;
 
   const handleAdd = async () => {
     if (!form.ticker || !form.amount || !form.month || !form.year) return;
