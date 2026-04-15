@@ -11,13 +11,20 @@ interface Props {
 }
 
 export function InvestmentCalculator({ defaultInitial = 0, defaultRate = 0 }: Props) {
-  const [initial, setInitial] = useState("");
-  const [rate, setRate] = useState("");
-  const [monthly, setMonthly] = useState("");
-  const [months, setMonths] = useState("");
-  const [initialized, setInitialized] = useState(false);
+  const stored = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("investCalc");
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }, []);
 
-  // Set defaults from portfolio once available
+  const [initial, setInitial] = useState(stored?.initial ?? "");
+  const [rate, setRate] = useState(stored?.rate ?? "");
+  const [monthly, setMonthly] = useState(stored?.monthly ?? "");
+  const [months, setMonths] = useState(stored?.months ?? "");
+  const [initialized, setInitialized] = useState(!!stored);
+
+  // Set defaults from portfolio once available (only if no stored values)
   useEffect(() => {
     if (!initialized && defaultInitial > 0) {
       setInitial(defaultInitial.toFixed(2).replace(".", ","));
@@ -25,6 +32,11 @@ export function InvestmentCalculator({ defaultInitial = 0, defaultRate = 0 }: Pr
       setInitialized(true);
     }
   }, [defaultInitial, defaultRate, initialized]);
+
+  // Persist to localStorage on change
+  useEffect(() => {
+    localStorage.setItem("investCalc", JSON.stringify({ initial, rate, monthly, months }));
+  }, [initial, rate, monthly, months]);
 
   const result = useMemo(() => {
     const PV = parseFloat(initial.replace(",", ".")) || 0;
