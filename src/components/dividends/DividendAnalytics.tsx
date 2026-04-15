@@ -145,8 +145,8 @@ export function DividendAnalytics({ dividends, assets }: Props) {
                       <TableHead className="font-mono text-xs text-right">YoC Total</TableHead>
                       <TableHead className="font-mono text-xs text-right">YoC {currentYear}</TableHead>
                       <TableHead className="font-mono text-xs text-right">Média/Mês</TableHead>
-                      <TableHead className="font-mono text-xs text-center">Meses</TableHead>
-                    </TableRow>
+                       <TableHead className="font-mono text-xs text-center">Meses</TableHead>
+                       <TableHead className="font-mono text-xs text-center">Frequência</TableHead>
                   </TableHeader>
                   <TableBody>
                     {analyticsData.map((a) => (
@@ -158,8 +158,8 @@ export function DividendAnalytics({ dividends, assets }: Props) {
                         <TableCell className="font-mono text-xs text-right font-medium">{a.yieldOnCost}%</TableCell>
                         <TableCell className="font-mono text-xs text-right">{a.yieldOnCostYear}%</TableCell>
                         <TableCell className="font-mono text-xs text-right">{formatBRL(a.avgMonthly)}</TableCell>
-                        <TableCell className="font-mono text-xs text-center">{a.monthsReceived}</TableCell>
-                      </TableRow>
+                         <TableCell className="font-mono text-xs text-center">{a.monthsReceived}</TableCell>
+                         <TableCell className="font-mono text-xs text-center">{a.frequency}</TableCell>
                     ))}
                   </TableBody>
                 </Table>
