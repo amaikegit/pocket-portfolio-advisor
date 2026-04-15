@@ -147,20 +147,22 @@ export function DividendAnalytics({ dividends, assets }: Props) {
                       <TableHead className="font-mono text-xs text-right">Média/Mês</TableHead>
                        <TableHead className="font-mono text-xs text-center">Meses</TableHead>
                        <TableHead className="font-mono text-xs text-center">Frequência</TableHead>
-                  </TableHeader>
-                  <TableBody>
-                    {analyticsData.map((a) => (
-                      <TableRow key={a.ticker}>
-                        <TableCell className="font-mono text-xs font-medium">{a.ticker}</TableCell>
-                        <TableCell className="font-mono text-xs text-right">{formatBRL(a.invested)}</TableCell>
-                        <TableCell className="font-mono text-xs text-right text-primary">{formatBRL(a.totalDiv)}</TableCell>
-                        <TableCell className="font-mono text-xs text-right">{formatBRL(a.divYear)}</TableCell>
-                        <TableCell className="font-mono text-xs text-right font-medium">{a.yieldOnCost}%</TableCell>
-                        <TableCell className="font-mono text-xs text-right">{a.yieldOnCostYear}%</TableCell>
-                        <TableCell className="font-mono text-xs text-right">{formatBRL(a.avgMonthly)}</TableCell>
+                     </TableRow>
+                   </TableHeader>
+                   <TableBody>
+                     {analyticsData.map((a) => (
+                       <TableRow key={a.ticker}>
+                         <TableCell className="font-mono text-xs font-medium">{a.ticker}</TableCell>
+                         <TableCell className="font-mono text-xs text-right">{formatBRL(a.invested)}</TableCell>
+                         <TableCell className="font-mono text-xs text-right text-primary">{formatBRL(a.totalDiv)}</TableCell>
+                         <TableCell className="font-mono text-xs text-right">{formatBRL(a.divYear)}</TableCell>
+                         <TableCell className="font-mono text-xs text-right font-medium">{a.yieldOnCost}%</TableCell>
+                         <TableCell className="font-mono text-xs text-right">{a.yieldOnCostYear}%</TableCell>
+                         <TableCell className="font-mono text-xs text-right">{formatBRL(a.avgMonthly)}</TableCell>
                          <TableCell className="font-mono text-xs text-center">{a.monthsReceived}</TableCell>
                          <TableCell className="font-mono text-xs text-center">{a.frequency}</TableCell>
-                    ))}
+                       </TableRow>
+                     ))}
                   </TableBody>
                 </Table>
               </div>
