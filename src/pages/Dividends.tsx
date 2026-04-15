@@ -211,6 +211,9 @@ const Dividends = () => {
       <div>
         <label className="text-sm text-muted-foreground">Valor (R$)</label>
         <Input placeholder="0,00" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+        {lastAmountHint !== null && !form.amount && (
+          <p className="text-xs text-muted-foreground mt-1">Último valor: {formatBRL(lastAmountHint)}</p>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
