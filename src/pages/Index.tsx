@@ -127,6 +127,7 @@ const Index = () => {
           </div>
         )}
         <SummaryCards totals={totals} />
+        <PortfolioEvolution assets={assets} />
         <PortfolioCharts assets={calculatedAssets} />
         <PortfolioTable assets={calculatedAssets} onRemove={removeAsset} onUpdate={updateAsset} />
       </main>
