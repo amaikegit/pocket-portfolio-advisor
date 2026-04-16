@@ -71,6 +71,7 @@ const Index = () => {
 
           {/* Mobile buttons */}
           <div className="flex md:hidden items-center gap-1.5">
+            <ThemeToggle />
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleRefreshAll} disabled={refreshing}>
               {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
             </Button>
