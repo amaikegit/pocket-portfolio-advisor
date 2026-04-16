@@ -3,6 +3,7 @@ import { TransactionHistory } from "@/components/TransactionHistory";
 import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useNavigate } from "react-router-dom";
 
 const Transactions = () => {
@@ -21,7 +22,10 @@ const Transactions = () => {
               Histórico de <span className="text-primary">Lançamentos</span>
             </h1>
           </div>
-          <AddTransactionDialog onAdd={addTransaction} existingTickers={assets.map(a => a.ticker)} />
+          <div className="flex gap-2">
+            <AddTransactionDialog onAdd={addTransaction} existingTickers={assets.map(a => a.ticker)} />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
