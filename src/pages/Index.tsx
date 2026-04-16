@@ -7,6 +7,7 @@ import { CSVImportDialog } from "@/components/CSVImportDialog";
 import { PortfolioTable } from "@/components/PortfolioTable";
 import { SummaryCards } from "@/components/SummaryCards";
 import { PortfolioCharts } from "@/components/PortfolioCharts";
+import { PortfolioEvolution } from "@/components/PortfolioEvolution";
 import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
