@@ -22,16 +22,19 @@ export function InvestmentCalculator({ defaultInitial = 0, defaultRate = 0 }: Pr
   const [rate, setRate] = useState(stored?.rate ?? "");
   const [monthly, setMonthly] = useState(stored?.monthly ?? "");
   const [months, setMonths] = useState(stored?.months ?? "");
-  const [initialized, setInitialized] = useState(!!stored);
 
-  // Set defaults from portfolio once available (only if no stored values)
+  // Always update initial and rate from portfolio values
   useEffect(() => {
-    if (!initialized && defaultInitial > 0) {
+    if (defaultInitial > 0) {
       setInitial(defaultInitial.toFixed(2).replace(".", ","));
-      setRate(defaultRate.toFixed(2).replace(".", ","));
-      setInitialized(true);
     }
-  }, [defaultInitial, defaultRate, initialized]);
+  }, [defaultInitial]);
+
+  useEffect(() => {
+    if (defaultRate > 0) {
+      setRate(defaultRate.toFixed(2).replace(".", ","));
+    }
+  }, [defaultRate]);
 
   // Persist to localStorage on change
   useEffect(() => {

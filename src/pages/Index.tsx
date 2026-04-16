@@ -11,6 +11,7 @@ import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { BarChart3, RefreshCw, Loader2, FileText, LogOut, Menu, Clock, DollarSign } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Sheet, SheetContent, SheetTrigger,
@@ -62,6 +63,7 @@ const Index = () => {
               <DollarSign className="h-4 w-4" />
               Dividendos
             </Button>
+            <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={signOut} title="Sair">
               <LogOut className="h-4 w-4" />
             </Button>
@@ -69,6 +71,7 @@ const Index = () => {
 
           {/* Mobile buttons */}
           <div className="flex md:hidden items-center gap-1.5">
+            <ThemeToggle />
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleRefreshAll} disabled={refreshing}>
               {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
             </Button>
