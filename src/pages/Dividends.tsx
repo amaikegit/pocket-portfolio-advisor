@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, Legend } from "recharts";
 import { BarChart3, Plus, ArrowLeft, LogOut, DollarSign, TrendingUp, Calendar, Loader2, Trash2, Pencil, Filter, ArrowUpDown, ChevronDown, ChevronRight } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 import { AccumulatedDividendsChart } from "@/components/dividends/AccumulatedDividendsChart";
 import { AssetDividendEvolution } from "@/components/dividends/AssetDividendEvolution";
@@ -273,6 +274,7 @@ const Dividends = () => {
                 <Button className="w-full" onClick={handleAdd}>Salvar</Button>
               </DialogContent>
             </Dialog>
+            <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={signOut} title="Sair">
               <LogOut className="h-4 w-4" />
             </Button>
