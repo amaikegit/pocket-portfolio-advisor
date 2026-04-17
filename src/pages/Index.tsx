@@ -8,6 +8,7 @@ import { PortfolioTable } from "@/components/PortfolioTable";
 import { SummaryCards } from "@/components/SummaryCards";
 import { PortfolioCharts } from "@/components/PortfolioCharts";
 import { PortfolioEvolution } from "@/components/PortfolioEvolution";
+import { PortfolioSnapshots } from "@/components/PortfolioSnapshots";
 import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -127,6 +128,7 @@ const Index = () => {
           </div>
         )}
         <SummaryCards totals={totals} />
+        <PortfolioSnapshots />
         <PortfolioEvolution assets={assets} />
         <PortfolioCharts assets={calculatedAssets} />
         <PortfolioTable assets={calculatedAssets} onRemove={removeAsset} onUpdate={updateAsset} />
