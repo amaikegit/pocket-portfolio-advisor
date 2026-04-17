@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      alerts: {
+        Row: {
+          created_at: string
+          dedupe_key: string
+          id: string
+          message: string
+          metadata: Json | null
+          read: boolean
+          severity: string
+          ticker: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dedupe_key: string
+          id?: string
+          message: string
+          metadata?: Json | null
+          read?: boolean
+          severity?: string
+          ticker?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dedupe_key?: string
+          id?: string
+          message?: string
+          metadata?: Json | null
+          read?: boolean
+          severity?: string
+          ticker?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       assets: {
         Row: {
           average_price: number
