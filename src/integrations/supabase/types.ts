@@ -95,6 +95,36 @@ export type Database = {
         }
         Relationships: []
       }
+      portfolio_snapshots: {
+        Row: {
+          created_at: string
+          id: string
+          snapshot_date: string
+          total_current: number
+          total_difference: number
+          total_invested: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          snapshot_date?: string
+          total_current?: number
+          total_difference?: number
+          total_invested?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          snapshot_date?: string
+          total_current?: number
+          total_difference?: number
+          total_invested?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           asset_type: string
