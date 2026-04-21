@@ -63,19 +63,40 @@ serve(async (req) => {
         const totalCurrent = assets.reduce((s: number, a: any) => s + Number(a.quantity || 0) * Number(a.current_price || 0), 0);
         const dividendsWeek = (divs ?? []).reduce((s: number, d: any) => s + Number(d.amount || 0), 0);
 
+        // Compute per-asset performance to highlight top/bottom 3
+        const perf = assets.map((a: any) => {
+          const qty = Number(a.quantity || 0);
+          const avg = Number(a.average_price || 0);
+          const cur = Number(a.current_price || 0);
+          const invested = qty * avg;
+          const atual = qty * cur;
+          const diff = atual - invested;
+          const pct = invested > 0 ? (diff / invested) * 100 : 0;
+          return {
+            ticker: a.ticker,
+            cotas: qty,
+            precoMedio: avg,
+            precoAtual: cur,
+            investido: invested,
+            atual,
+            diferenca: diff,
+            variacaoPct: pct,
+            dy: Number(a.dividend_yield || 0),
+            pvp: Number(a.pvp || 0),
+          };
+        });
+        const sortedByPct = [...perf].sort((a, b) => b.variacaoPct - a.variacaoPct);
+        const top3 = sortedByPct.slice(0, 3);
+        const bottom3 = sortedByPct.slice(-3).reverse();
+
         const portfolioSummary = {
           totalInvested,
           totalCurrent,
           difference: totalCurrent - totalInvested,
           rentabilidadePct: totalInvested > 0 ? ((totalCurrent - totalInvested) / totalInvested) * 100 : 0,
-          ativos: assets.map((a: any) => ({
-            ticker: a.ticker,
-            cotas: Number(a.quantity),
-            precoMedio: Number(a.average_price),
-            precoAtual: Number(a.current_price),
-            dy: Number(a.dividend_yield),
-            pvp: Number(a.pvp),
-          })),
+          ativos: perf,
+          top3Melhores: top3,
+          top3Piores: bottom3,
           dividendosUltimaSemana: {
             total: dividendsWeek,
             quantidade: divs?.length ?? 0,
@@ -85,15 +106,37 @@ serve(async (req) => {
         };
 
         const systemPrompt = `Você é um analista financeiro especialista em FIIs e ações brasileiras.
-Gere um RELATÓRIO SEMANAL conciso (máximo 600 palavras) em português brasileiro com:
+Gere um RELATÓRIO SEMANAL profissional, bem formatado e fácil de ler em português brasileiro (máximo 800 palavras).
 
-1. **Resumo Executivo** (2-3 linhas sobre o estado da carteira)
-2. **Performance da Semana** (variação patrimonial e dividendos recebidos)
-3. **Destaques** (2-3 ativos para observar — positivos ou negativos)
-4. **Tendência dos Últimos 30 dias** (com base nos snapshots)
-5. **Recomendações Práticas** (2-3 ações concretas para a próxima semana)
+Estrutura OBRIGATÓRIA usando markdown rico (títulos, listas, negrito, tabelas e emojis sutis para hierarquia visual):
 
-Use markdown. Seja direto, prático e baseado nos dados fornecidos.`;
+## 📊 Resumo Executivo
+2-3 linhas diretas sobre o estado geral da carteira (patrimônio, rentabilidade %, dividendos da semana).
+
+## 📈 Performance da Semana
+- Variação patrimonial absoluta e percentual
+- Total de dividendos recebidos e quantidade de pagamentos
+- Comparação com a tendência dos últimos 30 dias (use os snapshots)
+
+## 🏆 Destaques da Carteira
+
+### ✅ Top 3 Melhores
+Apresente em **tabela markdown** com colunas: Ticker | Variação % | Comentário curto. Use exatamente os ativos de \`top3Melhores\`.
+
+### ⚠️ Top 3 Piores
+Apresente em **tabela markdown** com colunas: Ticker | Variação % | Comentário curto. Use exatamente os ativos de \`top3Piores\`.
+
+## 🎯 Sugestões de Ação para a Próxima Semana
+Liste de 3 a 5 ações **objetivas, numeradas e acionáveis** (ex: "Avaliar reforço em XPTO11 — DY de X% e P/VP abaixo de 1", "Reavaliar tese de YYYY3 após queda de Z%"). Cada item deve citar o ticker quando aplicável e o motivo em uma frase.
+
+## 🔮 Visão para os Próximos Dias
+1-2 frases de fechamento com perspectiva prática.
+
+Regras de formatação:
+- Use **negrito** para números e tickers importantes.
+- Use tabelas markdown reais (com \`|\` e \`---\`) para os destaques.
+- Não invente dados — use somente o que foi fornecido.
+- Evite jargão excessivo; seja direto e prático.`;
 
         const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
