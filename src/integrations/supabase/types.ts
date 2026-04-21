@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_reports: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          portfolio_snapshot: Json | null
+          report_type: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          portfolio_snapshot?: Json | null
+          report_type?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          portfolio_snapshot?: Json | null
+          report_type?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       alerts: {
         Row: {
           created_at: string

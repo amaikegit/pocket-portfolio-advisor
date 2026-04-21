@@ -11,6 +11,7 @@ import { PortfolioEvolution } from "@/components/PortfolioEvolution";
 import { PortfolioSnapshots } from "@/components/PortfolioSnapshots";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
+import { AIReportsHistory } from "@/components/AIReportsHistory";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { BarChart3, RefreshCw, Loader2, FileText, LogOut, Menu, Clock, DollarSign } from "lucide-react";
@@ -131,6 +132,7 @@ const Index = () => {
         <SummaryCards totals={totals} />
         <AlertsPanel />
         <PortfolioSnapshots />
+        <AIReportsHistory />
         <PortfolioEvolution assets={assets} />
         <PortfolioCharts assets={calculatedAssets} />
         <PortfolioTable assets={calculatedAssets} onRemove={removeAsset} onUpdate={updateAsset} />
