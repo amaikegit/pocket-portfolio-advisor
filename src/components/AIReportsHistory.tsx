@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FileText, Loader2, Sparkles, Trash2, Eye, Calendar } from "lucide-react";
+import { FileText, Loader2, Sparkles, Trash2, Eye, Calendar, Download } from "lucide-react";
 import { toast } from "sonner";
 
 interface AIReport {
@@ -23,6 +26,7 @@ export function AIReportsHistory() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [selected, setSelected] = useState<AIReport | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -73,6 +77,45 @@ export function AIReportsHistory() {
     else {
       setReports((prev) => prev.filter((r) => r.id !== id));
       if (selected?.id === id) setSelected(null);
+    }
+  };
+
+  const exportPDF = async () => {
+    if (!selected) return;
+    const node = document.getElementById("ai-report-printable");
+    if (!node) return;
+    setExporting(true);
+    try {
+      const canvas = await html2canvas(node, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+      });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth - 20; // 10mm margins
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 10;
+      pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight - 20;
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight + 10;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight - 20;
+      }
+      const safeTitle = selected.title.replace(/[^a-z0-9\-_ ]/gi, "").trim() || "relatorio";
+      pdf.save(`${safeTitle}.pdf`);
+      toast.success("PDF exportado!");
+    } catch (e) {
+      console.error(e);
+      toast.error("Falha ao exportar PDF.");
+    } finally {
+      setExporting(false);
     }
   };
 
