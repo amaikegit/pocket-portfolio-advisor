@@ -111,7 +111,11 @@ Gere um RELATÓRIO SEMANAL profissional, bem formatado e fácil de ler em portug
 Estrutura OBRIGATÓRIA usando markdown rico (títulos, listas, negrito, tabelas e emojis sutis para hierarquia visual):
 
 ## 📊 Resumo Executivo
-2-3 linhas diretas sobre o estado geral da carteira (patrimônio, rentabilidade %, dividendos da semana).
+**SEMPRE a primeira seção do relatório.** Escreva exatamente 2 a 3 linhas curtas e diretas, em formato de parágrafo único, destacando obrigatoriamente em **negrito**:
+- **Patrimônio atual** (valor de \`totalCurrent\` formatado como R$ com separador de milhar e 2 casas decimais).
+- **Rentabilidade acumulada %** (valor de \`rentabilidadePct\` com 2 casas decimais e sinal + ou −).
+- **Dividendos da semana** (valor de \`dividendosUltimaSemana.total\` em R$ e quantidade de pagamentos entre parênteses).
+Não use listas nem subtítulos aqui — apenas um parágrafo enxuto e impactante que sirva como TL;DR da carteira.
 
 ## 📈 Performance da Semana
 - Variação patrimonial absoluta e percentual
