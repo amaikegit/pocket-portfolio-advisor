@@ -181,9 +181,39 @@ Regras de formatação:
             assetsCount: assets.length,
             dividendsWeek,
           },
-        });
-        if (insErr) errors.push(`user ${u.id}: insert ${insErr.message}`);
-        else processed++;
+        }).select("id").single();
+        if (insErr) {
+          errors.push(`user ${u.id}: insert ${insErr.message}`);
+        } else {
+          // Save executive snapshot for cross-report tracking
+          const rentabilidadePct = totalInvested > 0 ? ((totalCurrent - totalInvested) / totalInvested) * 100 : 0;
+          const { data: prev } = await admin
+            .from("report_snapshots")
+            .select("id, total_current, rentabilidade_pct, dividends_week_total")
+            .eq("user_id", u.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const reportRow = (insErr ? null : (await admin.from("ai_reports").select("id").eq("user_id", u.id).order("created_at", { ascending: false }).limit(1).maybeSingle()).data) as any;
+
+          const { error: snapErr } = await admin.from("report_snapshots").insert({
+            user_id: u.id,
+            report_id: reportRow?.id ?? null,
+            report_type: reportType,
+            total_current: totalCurrent,
+            total_invested: totalInvested,
+            rentabilidade_pct: rentabilidadePct,
+            dividends_week_total: dividendsWeek,
+            dividends_week_count: divs?.length ?? 0,
+            previous_snapshot_id: prev?.id ?? null,
+            delta_current: prev ? totalCurrent - Number(prev.total_current) : null,
+            delta_rentabilidade_pct: prev ? rentabilidadePct - Number(prev.rentabilidade_pct) : null,
+            delta_dividends_week: prev ? dividendsWeek - Number(prev.dividends_week_total) : null,
+          });
+          if (snapErr) errors.push(`user ${u.id}: snapshot ${snapErr.message}`);
+          processed++;
+        }
       } catch (e) {
         errors.push(`user ${u.id}: ${e instanceof Error ? e.message : String(e)}`);
       }
