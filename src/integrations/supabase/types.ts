@@ -197,6 +197,57 @@ export type Database = {
         }
         Relationships: []
       }
+      report_snapshots: {
+        Row: {
+          created_at: string
+          delta_current: number | null
+          delta_dividends_week: number | null
+          delta_rentabilidade_pct: number | null
+          dividends_week_count: number
+          dividends_week_total: number
+          id: string
+          previous_snapshot_id: string | null
+          rentabilidade_pct: number
+          report_id: string | null
+          report_type: string
+          total_current: number
+          total_invested: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delta_current?: number | null
+          delta_dividends_week?: number | null
+          delta_rentabilidade_pct?: number | null
+          dividends_week_count?: number
+          dividends_week_total?: number
+          id?: string
+          previous_snapshot_id?: string | null
+          rentabilidade_pct?: number
+          report_id?: string | null
+          report_type?: string
+          total_current?: number
+          total_invested?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          delta_current?: number | null
+          delta_dividends_week?: number | null
+          delta_rentabilidade_pct?: number | null
+          dividends_week_count?: number
+          dividends_week_total?: number
+          id?: string
+          previous_snapshot_id?: string | null
+          rentabilidade_pct?: number
+          report_id?: string | null
+          report_type?: string
+          total_current?: number
+          total_invested?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           asset_type: string
