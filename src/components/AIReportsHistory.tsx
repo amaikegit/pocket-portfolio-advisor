@@ -179,17 +179,54 @@ export function AIReportsHistory() {
       </CardContent>
 
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-mono-display">
-              <Sparkles className="h-4 w-4 text-primary" />
-              {selected?.title}
-            </DialogTitle>
+            <div className="flex items-start justify-between gap-3">
+              <DialogTitle className="flex items-center gap-2 font-mono-display text-left">
+                <Sparkles className="h-4 w-4 text-primary" />
+                {selected?.title}
+              </DialogTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={exportPDF}
+                disabled={exporting || !selected}
+                className="gap-2 shrink-0"
+              >
+                {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                {exporting ? "Exportando..." : "Exportar PDF"}
+              </Button>
+            </div>
           </DialogHeader>
           <ScrollArea className="flex-1 mt-2">
             {selected && (
-              <div className="prose prose-sm dark:prose-invert max-w-none pr-4">
-                <ReactMarkdown>{selected.content}</ReactMarkdown>
+              <div
+                id="ai-report-printable"
+                className="bg-background text-foreground px-6 py-4 rounded-md"
+              >
+                <div className="mb-4 pb-3 border-b border-border">
+                  <h1 className="text-xl font-mono-display font-semibold mb-1">{selected.title}</h1>
+                  <p className="text-xs text-muted-foreground">
+                    Gerado em {new Date(selected.created_at).toLocaleString("pt-BR")}
+                  </p>
+                </div>
+                <article
+                  className="
+                    prose prose-sm dark:prose-invert max-w-none
+                    prose-headings:font-mono-display prose-headings:font-semibold
+                    prose-h2:text-lg prose-h2:mt-5 prose-h2:mb-2 prose-h2:border-b prose-h2:border-border prose-h2:pb-1
+                    prose-h3:text-base prose-h3:mt-4 prose-h3:mb-1.5
+                    prose-p:leading-relaxed
+                    prose-strong:text-foreground
+                    prose-ul:my-2 prose-ol:my-2
+                    prose-li:my-0.5
+                    prose-table:text-xs prose-table:my-3
+                    prose-th:bg-muted prose-th:px-2 prose-th:py-1.5 prose-th:text-left prose-th:font-semibold
+                    prose-td:px-2 prose-td:py-1.5 prose-td:border-t prose-td:border-border
+                  "
+                >
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{selected.content}</ReactMarkdown>
+                </article>
               </div>
             )}
           </ScrollArea>
