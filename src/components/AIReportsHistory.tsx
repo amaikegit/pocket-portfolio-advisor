@@ -11,6 +11,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileText, Loader2, Sparkles, Trash2, Eye, Calendar, Download } from "lucide-react";
 import { toast } from "sonner";
+import { fetchPageByCreatedAtDesc } from "@/lib/supabasePagination";
+
+const PAGE_SIZE = 25;
 
 interface AIReport {
   id: string;
@@ -27,20 +30,41 @@ export function AIReportsHistory() {
   const [generating, setGenerating] = useState(false);
   const [selected, setSelected] = useState<AIReport | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("ai_reports")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(50);
-    if (error) {
+    try {
+      const { rows, nextCursor } = await fetchPageByCreatedAtDesc<AIReport>(
+        "ai_reports", "*", undefined, null, PAGE_SIZE,
+      );
+      setReports(rows);
+      setCursor(nextCursor);
+      setHasMore(!!nextCursor);
+    } catch {
       toast.error("Erro ao carregar relatórios.");
-    } else {
-      setReports(data ?? []);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const loadMore = async () => {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const { rows, nextCursor } = await fetchPageByCreatedAtDesc<AIReport>(
+        "ai_reports", "*", undefined, cursor, PAGE_SIZE,
+      );
+      setReports((prev) => [...prev, ...rows]);
+      setCursor(nextCursor);
+      setHasMore(!!nextCursor);
+    } catch {
+      toast.error("Erro ao carregar mais relatórios.");
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   useEffect(() => {
@@ -173,6 +197,20 @@ export function AIReportsHistory() {
                   </div>
                 </div>
               ))}
+              {hasMore && (
+                <div className="flex justify-center pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="gap-2"
+                  >
+                    {loadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                    Carregar mais
+                  </Button>
+                </div>
+              )}
             </div>
           </ScrollArea>
         )}

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { fetchAllPaginated } from "@/lib/supabasePagination";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Loader2, Camera } from "lucide-react";
 
@@ -34,14 +35,21 @@ export function PortfolioSnapshots() {
     setLoading(true);
     const since = new Date();
     since.setDate(since.getDate() - period);
-    const { data: rows, error } = await supabase
-      .from("portfolio_snapshots")
-      .select("snapshot_date, total_current, total_invested, total_difference")
-      .eq("user_id", user.id)
-      .gte("snapshot_date", since.toISOString().slice(0, 10))
-      .order("snapshot_date", { ascending: true });
-    if (error) toast({ title: "Erro ao carregar histórico", description: error.message, variant: "destructive" });
-    else setData((rows ?? []) as Snapshot[]);
+    try {
+      // Paginated: a long-running user with daily snapshots can exceed 1000 rows
+      // for the "Tudo" period; without paging, the chart would silently truncate.
+      const rows = await fetchAllPaginated<Snapshot>(
+        "portfolio_snapshots",
+        "snapshot_date, total_current, total_invested, total_difference",
+        (q) => q.eq("user_id", user.id).gte("snapshot_date", since.toISOString().slice(0, 10)),
+      );
+      // Order chronologically for the chart (helper orders by created_at, but
+      // snapshot_date is what the X axis uses).
+      rows.sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+      setData(rows);
+    } catch (e: any) {
+      toast({ title: "Erro ao carregar histórico", description: e?.message ?? String(e), variant: "destructive" });
+    }
     setLoading(false);
   };
 

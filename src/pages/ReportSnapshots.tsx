@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, ArrowLeft, ArrowDownRight, ArrowUpRight, Minus, Loader2, History, Trash2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchPageByCreatedAtDesc } from "@/lib/supabasePagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,17 +62,43 @@ const ReportSnapshots = () => {
   const [from, setFrom] = useState<Date | undefined>();
   const [to, setTo] = useState<Date | undefined>();
   const [reportType, setReportType] = useState<string>("all");
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const PAGE_SIZE = 50;
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("report_snapshots")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(200);
-    if (error) toast.error("Erro ao carregar snapshots.");
-    else setSnapshots((data ?? []) as ReportSnapshot[]);
-    setLoading(false);
+    try {
+      const { rows, nextCursor } = await fetchPageByCreatedAtDesc<ReportSnapshot>(
+        "report_snapshots", "*", undefined, null, PAGE_SIZE,
+      );
+      setSnapshots(rows);
+      setCursor(nextCursor);
+      setHasMore(!!nextCursor);
+    } catch {
+      toast.error("Erro ao carregar snapshots.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const { rows, nextCursor } = await fetchPageByCreatedAtDesc<ReportSnapshot>(
+        "report_snapshots", "*", undefined, cursor, PAGE_SIZE,
+      );
+      setSnapshots((prev) => [...prev, ...rows]);
+      setCursor(nextCursor);
+      setHasMore(!!nextCursor);
+    } catch {
+      toast.error("Erro ao carregar mais snapshots.");
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -276,6 +303,14 @@ const ReportSnapshots = () => {
                     ))}
                   </TableBody>
                 </Table>
+                {hasMore && (
+                  <div className="flex justify-center pt-4">
+                    <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore} className="gap-2">
+                      {loadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Carregar mais
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
