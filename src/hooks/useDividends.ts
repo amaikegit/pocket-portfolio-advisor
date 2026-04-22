@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { fetchAllPaginated } from "@/lib/supabasePagination";
 
 export interface Dividend {
   id: string;
@@ -28,19 +29,20 @@ export function useDividends() {
 
   const fetchDividends = useCallback(async () => {
     if (!session?.user?.id) return;
-    const { data, error } = await supabase
-      .from("dividends")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .order("year", { ascending: true })
-      .order("month", { ascending: true });
-
-    if (error) {
-      toast({ title: "Erro ao carregar dividendos", description: error.message, variant: "destructive" });
+    let data: any[] = [];
+    try {
+      // Paginated to avoid the 1000-row cap; aggregations below assume full dataset.
+      data = await fetchAllPaginated<any>(
+        "dividends",
+        "*",
+        (q) => q.eq("user_id", session.user.id),
+      );
+    } catch (e: any) {
+      toast({ title: "Erro ao carregar dividendos", description: e?.message ?? String(e), variant: "destructive" });
       return;
     }
     setDividends(
-      (data || []).map((d: any) => ({
+      data.map((d: any) => ({
         id: d.id,
         ticker: d.ticker,
         amount: Number(d.amount),

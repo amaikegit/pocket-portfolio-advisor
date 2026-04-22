@@ -4,6 +4,7 @@ import { calculateAsset, parseCSV } from "@/lib/portfolio";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { fetchAllPaginated } from "@/lib/supabasePagination";
 
 /** Recalculate an asset's quantity, averagePrice, totalInvested from transactions */
 function applyTransactions(assets: Asset[], transactions: Transaction[]): Asset[] {
@@ -107,21 +108,26 @@ export function usePortfolio() {
     if (!user) return;
     const load = async () => {
       setLoading(true);
-      const [assetsRes, txRes] = await Promise.all([
-        supabase.from("assets").select("*").eq("user_id", user.id),
-        supabase.from("transactions").select("*").eq("user_id", user.id),
-      ]);
-      if (assetsRes.data) {
-        setBaseAssets(assetsRes.data.map(rowToAsset));
-        // Set lastUpdated from max updated_at
-        const dates = assetsRes.data.map(r => new Date(r.updated_at)).filter(d => !isNaN(d.getTime()));
-        if (dates.length > 0) setLastUpdated(new Date(Math.max(...dates.map(d => d.getTime()))));
+      try {
+        // Paginated reads guarantee correctness even when a user has >1000 transactions.
+        const [assetsData, txData] = await Promise.all([
+          fetchAllPaginated<any>("assets", "*", (q) => q.eq("user_id", user.id)),
+          fetchAllPaginated<any>("transactions", "*", (q) => q.eq("user_id", user.id)),
+        ]);
+        setBaseAssets(assetsData.map(rowToAsset));
+        const dates = assetsData
+          .map((r: any) => new Date(r.updated_at))
+          .filter((d) => !isNaN(d.getTime()));
+        if (dates.length > 0) setLastUpdated(new Date(Math.max(...dates.map((d) => d.getTime()))));
+        setTransactions(txData.map(rowToTransaction));
+      } catch (e: any) {
+        toast({ title: "Erro ao carregar dados", description: e?.message ?? String(e), variant: "destructive" });
+      } finally {
+        setLoading(false);
       }
-      if (txRes.data) setTransactions(txRes.data.map(rowToTransaction));
-      setLoading(false);
     };
     load();
-  }, [user]);
+  }, [user, toast]);
 
   const assets = useMemo(() => applyTransactions(baseAssets, transactions), [baseAssets, transactions]);
 
