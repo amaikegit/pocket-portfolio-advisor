@@ -62,19 +62,28 @@ serve(async (req) => {
       if (u?.user) userIds = [u.user.id];
     }
     if (userIds.length === 0) {
-      const { data: distinctUsers } = await supabase.from("assets").select("user_id");
-      userIds = [...new Set((distinctUsers ?? []).map((r) => r.user_id))];
+      // Paginate to ensure we capture all users, not just the first 1000 asset rows.
+      const distinctUsers = await fetchAllPaginated<{ user_id: string }>(
+        supabase, "assets", "user_id",
+      );
+      userIds = [...new Set(distinctUsers.map((r) => r.user_id))];
     }
 
     let inserted = 0;
     const today = new Date();
 
     for (const userId of userIds) {
-      const [{ data: assets }, { data: dividends }, { data: settings }] = await Promise.all([
-        supabase.from("assets").select("ticker, quantity").eq("user_id", userId),
-        supabase.from("dividends").select("ticker, amount, payment_date, year, month").eq("user_id", userId),
+      const [assets, dividends, settingsRes] = await Promise.all([
+        fetchAllPaginated<{ ticker: string; quantity: number }>(
+          supabase, "assets", "ticker, quantity", (q) => q.eq("user_id", userId),
+        ),
+        fetchAllPaginated<Dividend>(
+          supabase, "dividends", "ticker, amount, payment_date, year, month",
+          (q) => q.eq("user_id", userId),
+        ),
         supabase.from("user_settings").select("monthly_dividend_goal").eq("user_id", userId).maybeSingle(),
       ]);
+      const settings = settingsRes.data;
 
       const newAlerts: any[] = [];
 

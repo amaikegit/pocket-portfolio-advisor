@@ -80,10 +80,11 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get all distinct tickers
-    const { data: assets, error } = await supabase.from("assets").select("id, ticker");
-    if (error) throw error;
-    if (!assets || assets.length === 0) {
+    // Get all assets paginated (avoids the 1000-row PostgREST cap on multi-user systems).
+    const assets = await fetchAllPaginated<{ id: string; ticker: string }>(
+      supabase, "assets", "id, ticker",
+    );
+    if (assets.length === 0) {
       return new Response(JSON.stringify({ message: "No assets to update" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
