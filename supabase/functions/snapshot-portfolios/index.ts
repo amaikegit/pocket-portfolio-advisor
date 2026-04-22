@@ -6,6 +6,34 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Paginated fetch to bypass PostgREST's default 1000-row limit.
+// Uses range() in chunks of PAGE_SIZE until fewer than PAGE_SIZE rows return.
+const PAGE_SIZE = 1000;
+async function fetchAllPaginated<T = any>(
+  supabase: any,
+  table: string,
+  columns: string,
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  // Stable ordering is required for range() to be deterministic across pages.
+  // We order by created_at (present on both `assets` and `transactions`) as tiebreaker.
+  while (true) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from(table)
+      .select(columns)
+      .order("created_at", { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -15,13 +43,18 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Fetch all assets and transactions
-    const [{ data: assets, error: aErr }, { data: txs, error: tErr }] = await Promise.all([
-      supabase.from("assets").select("user_id, ticker, quantity, current_price, total_invested"),
-      supabase.from("transactions").select("user_id, ticker, type, quantity, price, other_costs"),
+    // Fetch all assets and transactions with pagination to avoid the 1000-row cap.
+    const [assets, txs] = await Promise.all([
+      fetchAllPaginated<{
+        user_id: string; ticker: string; quantity: number;
+        current_price: number; total_invested: number;
+      }>(supabase, "assets", "user_id, ticker, quantity, current_price, total_invested"),
+      fetchAllPaginated<{
+        user_id: string; ticker: string; type: string;
+        quantity: number; price: number; other_costs: number;
+      }>(supabase, "transactions", "user_id, ticker, type, quantity, price, other_costs"),
     ]);
-    if (aErr) throw aErr;
-    if (tErr) throw tErr;
+    console.log(`snapshot-portfolios: loaded ${assets.length} assets, ${txs.length} transactions`);
 
     // Recalc qty/cost from transactions per (user, ticker)
     type Key = string;
