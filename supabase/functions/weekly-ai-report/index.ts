@@ -7,6 +7,29 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Paginated fetch to bypass PostgREST's default 1000-row cap.
+const PAGE_SIZE = 1000;
+async function fetchAllPaginated<T = any>(
+  client: any,
+  table: string,
+  columns: string,
+  apply?: (q: any) => any,
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  while (true) {
+    let q = client.from(table).select(columns).order("created_at", { ascending: true });
+    if (apply) q = apply(q);
+    const { data, error } = await q.range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -27,8 +50,9 @@ serve(async (req) => {
     if (body.user_id) {
       users = [{ id: body.user_id }];
     } else {
-      const { data: assetsRows } = await admin.from("assets").select("user_id");
-      const ids = Array.from(new Set((assetsRows ?? []).map((r: any) => r.user_id)));
+      // Paginate to ensure ALL users with assets are processed (not just first 1000 rows).
+      const assetsRows = await fetchAllPaginated<{ user_id: string }>(admin, "assets", "user_id");
+      const ids = Array.from(new Set(assetsRows.map((r) => r.user_id)));
       users = ids.map((id) => ({ id }));
     }
 
@@ -37,27 +61,27 @@ serve(async (req) => {
 
     for (const u of users) {
       try {
-        const { data: assets } = await admin.from("assets").select("*").eq("user_id", u.id);
-        if (!assets || assets.length === 0) continue;
+        const assets = await fetchAllPaginated<any>(
+          admin, "assets", "*", (q) => q.eq("user_id", u.id),
+        );
+        if (assets.length === 0) continue;
 
         // Last week dividends
         const since = new Date();
         since.setDate(since.getDate() - 7);
-        const { data: divs } = await admin
-          .from("dividends")
-          .select("ticker, amount, payment_date")
-          .eq("user_id", u.id)
-          .gte("payment_date", since.toISOString().slice(0, 10));
+        const divs = await fetchAllPaginated<{ ticker: string; amount: number; payment_date: string }>(
+          admin, "dividends", "ticker, amount, payment_date",
+          (q) => q.eq("user_id", u.id).gte("payment_date", since.toISOString().slice(0, 10)),
+        );
 
         // Snapshots last 30d for trend
         const since30 = new Date();
         since30.setDate(since30.getDate() - 30);
-        const { data: snaps } = await admin
-          .from("portfolio_snapshots")
-          .select("snapshot_date, total_current, total_invested, total_difference")
-          .eq("user_id", u.id)
-          .gte("snapshot_date", since30.toISOString().slice(0, 10))
-          .order("snapshot_date", { ascending: true });
+        const snaps = await fetchAllPaginated<any>(
+          admin, "portfolio_snapshots",
+          "snapshot_date, total_current, total_invested, total_difference",
+          (q) => q.eq("user_id", u.id).gte("snapshot_date", since30.toISOString().slice(0, 10)),
+        );
 
         const totalInvested = assets.reduce((s: number, a: any) => s + Number(a.total_invested || 0), 0);
         const totalCurrent = assets.reduce((s: number, a: any) => s + Number(a.quantity || 0) * Number(a.current_price || 0), 0);

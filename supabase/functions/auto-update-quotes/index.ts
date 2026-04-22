@@ -6,6 +6,24 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const PAGE_SIZE = 1000;
+async function fetchAllPaginated<T = any>(client: any, table: string, columns: string): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await client
+      .from(table).select(columns)
+      .order("created_at", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
 async function fetchFromBrapi(ticker: string): Promise<number | null> {
   try {
     const res = await fetch(`https://brapi.dev/api/quote/${encodeURIComponent(ticker)}?range=1d&interval=1d`);
@@ -62,10 +80,11 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get all distinct tickers
-    const { data: assets, error } = await supabase.from("assets").select("id, ticker");
-    if (error) throw error;
-    if (!assets || assets.length === 0) {
+    // Get all assets paginated (avoids the 1000-row PostgREST cap on multi-user systems).
+    const assets = await fetchAllPaginated<{ id: string; ticker: string }>(
+      supabase, "assets", "id, ticker",
+    );
+    if (assets.length === 0) {
       return new Response(JSON.stringify({ message: "No assets to update" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
