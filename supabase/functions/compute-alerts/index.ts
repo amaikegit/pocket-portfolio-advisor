@@ -8,6 +8,25 @@ const corsHeaders = {
 
 interface Dividend { ticker: string; amount: number; payment_date: string; year: number; month: number; }
 
+const PAGE_SIZE = 1000;
+async function fetchAllPaginated<T = any>(
+  client: any, table: string, columns: string, apply?: (q: any) => any,
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  while (true) {
+    let q = client.from(table).select(columns).order("created_at", { ascending: true });
+    if (apply) q = apply(q);
+    const { data, error } = await q.range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
 function detectFrequencyDays(dates: string[]): number | null {
   if (dates.length < 2) return null;
   const sorted = [...dates].sort();
