@@ -197,6 +197,20 @@ export function AIReportsHistory() {
                   </div>
                 </div>
               ))}
+              {hasMore && (
+                <div className="flex justify-center pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="gap-2"
+                  >
+                    {loadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                    Carregar mais
+                  </Button>
+                </div>
+              )}
             </div>
           </ScrollArea>
         )}
