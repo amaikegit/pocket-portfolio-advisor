@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, ArrowLeft, ArrowDownRight, ArrowUpRight, Minus, Loader2, History, Trash2, RefreshCw } from "lucide-react";
+import { CalendarIcon, ArrowDownRight, ArrowUpRight, Minus, Loader2, History, Trash2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchPageByCreatedAtDesc } from "@/lib/supabasePagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { AppLayout } from "@/components/AppLayout";
 
 interface ReportSnapshot {
   id: string;
@@ -140,28 +141,20 @@ const ReportSnapshots = () => {
   const clearFilters = () => { setFrom(undefined); setTo(undefined); setReportType("all"); };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")} aria-label="Voltar">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="flex items-center gap-2 min-w-0">
-              <History className="h-4 w-4 text-primary shrink-0" />
-              <h1 className="font-mono-display text-base sm:text-lg font-bold tracking-tight truncate">
-                Histórico de Snapshots
-              </h1>
-            </div>
-          </div>
-          <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-2">
-            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            Atualizar
-          </Button>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-3 sm:px-4 py-6 space-y-6">
+    <AppLayout
+      title={
+        <span className="inline-flex items-center gap-2">
+          <History className="h-4 w-4 text-primary" />
+          Histórico de Snapshots
+        </span>
+      }
+    >
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-2">
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          Atualizar
+        </Button>
+      </div>
         {/* Filters */}
         <Card>
           <CardHeader>
