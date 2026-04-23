@@ -12,7 +12,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, Legend } from "recharts";
-import { Plus, DollarSign, TrendingUp, Calendar, Loader2, Trash2, Pencil, Filter, ArrowUpDown, ChevronDown, ChevronRight } from "lucide-react";
+import { BarChart3, Plus, DollarSign, TrendingUp, Calendar, Loader2, Trash2, Pencil, Filter, ArrowUpDown, ChevronDown, ChevronRight } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 
 import { AccumulatedDividendsChart } from "@/components/dividends/AccumulatedDividendsChart";
@@ -33,8 +33,6 @@ const Dividends = () => {
     years, monthlyByYear, totalByYear, totalAll, averageMonthly,
   } = useDividends();
   const { assets, calculatedAssets } = usePortfolio();
-  const { signOut } = useAuth();
-  const navigate = useNavigate();
 
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
