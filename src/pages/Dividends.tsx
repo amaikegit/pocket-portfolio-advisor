@@ -598,8 +598,7 @@ const Dividends = () => {
             return totalCurrent > 0 ? (totalMonthlyDY / totalCurrent) * 100 * 12 : 0;
           })()}
         />
-      </main>
-    </div>
+    </AppLayout>
   );
 };
 
