@@ -15,6 +15,7 @@ import type { Asset } from "@/types/portfolio";
 
 interface AddAssetDialogProps {
   onAdd: (asset: Omit<Asset, "id">) => void;
+  trigger?: React.ReactNode;
 }
 
 const defaultAsset = {
@@ -28,7 +29,7 @@ const defaultAsset = {
   pvp: 0,
 };
 
-export function AddAssetDialog({ onAdd }: AddAssetDialogProps) {
+export function AddAssetDialog({ onAdd, trigger }: AddAssetDialogProps) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(defaultAsset);
 
