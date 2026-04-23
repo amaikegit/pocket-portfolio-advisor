@@ -363,7 +363,7 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
                     </span>
                   </TableCell>
                   <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.priceVariation} colored /></TableCell>
-                  <TableCell className="text-center px-1.5 py-1.5"><StarRating rating={a.rating} /></TableCell>
+                  <TableCell className="text-center px-1.5 py-1.5"><StarRating rating={a.rating} breakdown={a.ratingBreakdown} /></TableCell>
                   <TableCell className="text-right font-mono-display text-xs px-1.5 py-1.5">{pct(a.portfolioProportion)}</TableCell>
                   <TableCell className="text-right px-1.5 py-1.5"><ValueCell value={a.totalVariationPerShare} colored /></TableCell>
                   <TableCell className="text-center px-1.5 py-1.5">
