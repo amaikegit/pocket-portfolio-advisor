@@ -11,9 +11,10 @@ import {
 
 interface CSVImportDialogProps {
   onImport: (csv: string) => number | Promise<number>;
+  trigger?: React.ReactNode;
 }
 
-export function CSVImportDialog({ onImport }: CSVImportDialogProps) {
+export function CSVImportDialog({ onImport, trigger }: CSVImportDialogProps) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -37,10 +38,12 @@ export function CSVImportDialog({ onImport }: CSVImportDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <Upload className="h-4 w-4" />
-          Importar CSV
-        </Button>
+        {trigger ?? (
+          <Button variant="outline" className="gap-2">
+            <Upload className="h-4 w-4" />
+            Importar CSV
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

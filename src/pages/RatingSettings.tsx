@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, RotateCcw, Save, Loader2 } from "lucide-react";
+import { RotateCcw, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -12,6 +11,7 @@ import { useRatingSettings } from "@/hooks/useRatingSettings";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { computeRating, DEFAULT_RATING_SETTINGS, RatingSettings } from "@/lib/rating";
 import { RatingCriterionKey } from "@/types/portfolio";
+import { AppLayout } from "@/components/AppLayout";
 
 const CRITERIA: { key: RatingCriterionKey; label: string; description: string }[] = [
   { key: "valuation",           label: "Valuation (P/VP)",          description: "Quanto menor o P/VP, mais barato o ativo está em relação ao patrimônio." },
@@ -23,7 +23,6 @@ const CRITERIA: { key: RatingCriterionKey; label: string; description: string }[
 ];
 
 export default function RatingSettingsPage() {
-  const navigate = useNavigate();
   const { settings, save, resetDefaults, loading, saving } = useRatingSettings();
   const { calculatedAssets } = usePortfolio();
   const [draft, setDraft] = useState<RatingSettings>(settings);
@@ -70,30 +69,18 @@ export default function RatingSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Voltar">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <h1 className="font-mono-display text-base sm:text-lg font-bold">
-              Configurações de <span className="text-primary">Rating</span>
-            </h1>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => setDraft(DEFAULT_RATING_SETTINGS)}>
-              <RotateCcw className="h-4 w-4" /> Restaurar padrão
-            </Button>
-            <Button className="gap-2" onClick={() => save(draft)} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Salvar
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-6">
+    <AppLayout
+      title={<>Configurações de <span className="text-primary">Rating</span></>}
+    >
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="outline" className="gap-2" onClick={() => setDraft(DEFAULT_RATING_SETTINGS)}>
+          <RotateCcw className="h-4 w-4" /> Restaurar padrão
+        </Button>
+        <Button className="gap-2" onClick={() => save(draft)} disabled={saving}>
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Salvar
+        </Button>
+      </div>
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center justify-between">
@@ -227,8 +214,7 @@ export default function RatingSettingsPage() {
             )}
           </CardContent>
         </Card>
-      </main>
-    </div>
+    </AppLayout>
   );
 }
 

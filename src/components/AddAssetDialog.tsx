@@ -15,6 +15,7 @@ import type { Asset } from "@/types/portfolio";
 
 interface AddAssetDialogProps {
   onAdd: (asset: Omit<Asset, "id">) => void;
+  trigger?: React.ReactNode;
 }
 
 const defaultAsset = {
@@ -28,7 +29,7 @@ const defaultAsset = {
   pvp: 0,
 };
 
-export function AddAssetDialog({ onAdd }: AddAssetDialogProps) {
+export function AddAssetDialog({ onAdd, trigger }: AddAssetDialogProps) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(defaultAsset);
 
@@ -46,10 +47,12 @@ export function AddAssetDialog({ onAdd }: AddAssetDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Adicionar Ativo
-        </Button>
+        {trigger ?? (
+          <Button className="gap-2">
+            <Plus className="h-4 w-4" />
+            Adicionar Ativo
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>

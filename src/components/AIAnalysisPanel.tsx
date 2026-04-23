@@ -10,9 +10,10 @@ import { toast } from "sonner";
 
 interface AIAnalysisPanelProps {
   assets: AssetCalculated[];
+  trigger?: React.ReactNode;
 }
 
-export function AIAnalysisPanel({ assets }: AIAnalysisPanelProps) {
+export function AIAnalysisPanel({ assets, trigger }: AIAnalysisPanelProps) {
   const [open, setOpen] = useState(false);
   const [analysis, setAnalysis] = useState("");
   const [loading, setLoading] = useState(false);
@@ -92,10 +93,12 @@ export function AIAnalysisPanel({ assets }: AIAnalysisPanelProps) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <BrainCircuit className="h-4 w-4" />
-          Análise IA
-        </Button>
+        {trigger ?? (
+          <Button variant="outline" className="gap-2">
+            <BrainCircuit className="h-4 w-4" />
+            Análise IA
+          </Button>
+        )}
       </SheetTrigger>
       <SheetContent className="w-full sm:max-w-xl flex flex-col">
         <SheetHeader>

@@ -25,9 +25,10 @@ const fmt = (v: number) =>
 interface Props {
   onAdd: (tx: Omit<Transaction, "id">) => void;
   existingTickers: string[];
+  trigger?: React.ReactNode;
 }
 
-export function AddTransactionDialog({ onAdd, existingTickers }: Props) {
+export function AddTransactionDialog({ onAdd, existingTickers, trigger }: Props) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<TransactionType>("buy");
   const [assetType, setAssetType] = useState<AssetType>("acoes");
@@ -72,10 +73,12 @@ export function AddTransactionDialog({ onAdd, existingTickers }: Props) {
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Adicionar Lançamento
-        </Button>
+        {trigger ?? (
+          <Button className="gap-2">
+            <Plus className="h-4 w-4" />
+            Adicionar Lançamento
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
