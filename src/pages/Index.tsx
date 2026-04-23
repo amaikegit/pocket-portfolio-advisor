@@ -14,7 +14,7 @@ import { AIAnalysisPanel } from "@/components/AIAnalysisPanel";
 import { AIReportsHistory } from "@/components/AIReportsHistory";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { BarChart3, RefreshCw, Loader2, FileText, LogOut, Menu, Clock, DollarSign, History } from "lucide-react";
+import { BarChart3, RefreshCw, Loader2, FileText, LogOut, Menu, Clock, DollarSign, History, Settings } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -71,6 +71,10 @@ const Index = () => {
               <History className="h-4 w-4" />
               Snapshots
             </Button>
+            <Button variant="outline" className="gap-2" onClick={() => navigate("/configuracoes/rating")}>
+              <Settings className="h-4 w-4" />
+              Rating
+            </Button>
             <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={signOut} title="Sair">
               <LogOut className="h-4 w-4" />
@@ -107,6 +111,10 @@ const Index = () => {
                   <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate("/snapshots")}>
                     <History className="h-4 w-4" />
                     Snapshots
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate("/configuracoes/rating")}>
+                    <Settings className="h-4 w-4" />
+                    Rating
                   </Button>
                   <Button variant="ghost" className="w-full justify-start gap-2 text-destructive" onClick={signOut}>
                     <LogOut className="h-4 w-4" />
