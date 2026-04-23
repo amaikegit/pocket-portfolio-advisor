@@ -10,6 +10,7 @@ import Dividends from "./pages/Dividends.tsx";
 import ReportSnapshots from "./pages/ReportSnapshots.tsx";
 import Auth from "./pages/Auth.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import RatingSettingsPage from "./pages/RatingSettings.tsx";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/lancamentos" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
             <Route path="/dividendos" element={<ProtectedRoute><Dividends /></ProtectedRoute>} />
             <Route path="/snapshots" element={<ProtectedRoute><ReportSnapshots /></ProtectedRoute>} />
+            <Route path="/configuracoes/rating" element={<ProtectedRoute><RatingSettingsPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

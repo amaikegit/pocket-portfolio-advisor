@@ -18,6 +18,31 @@ export interface AssetCalculated extends Asset {
   rating: number;
   portfolioProportion: number;
   totalVariationPerShare: number;
+  ratingScore: number;
+  ratingBreakdown: RatingBreakdown;
+}
+
+export type RatingCriterionKey =
+  | "valuation"
+  | "dividendYield"
+  | "priceVsAverage"
+  | "unrealizedPnL"
+  | "concentration"
+  | "dividendConsistency";
+
+export interface RatingCriterionResult {
+  key: RatingCriterionKey;
+  label: string;
+  detail: string;
+  score: number;       // 0..weight (contribution to total)
+  weight: number;      // configured weight
+  enabled: boolean;
+}
+
+export interface RatingBreakdown {
+  total: number; // 0..100
+  stars: number; // 1..5
+  items: RatingCriterionResult[];
 }
 
 export type TransactionType = "buy" | "sell";

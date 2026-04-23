@@ -1,23 +1,32 @@
 import { Asset, AssetCalculated } from "@/types/portfolio";
+import { computeRating, RatingSettings, RatingContext } from "@/lib/rating";
 
-export function calculateAsset(asset: Asset, totalPortfolio: number): AssetCalculated {
+export function calculateAsset(
+  asset: Asset,
+  totalPortfolio: number,
+  settings?: RatingSettings,
+  ctx?: RatingContext,
+): AssetCalculated {
   const totalCurrent = asset.quantity * asset.currentPrice;
   const difference = totalCurrent - asset.totalInvested;
   const monthlyProfitability = asset.currentPrice > 0 ? (asset.dividendYield / asset.currentPrice) * 100 : 0;
   const priceVariation = asset.currentPrice - asset.averagePrice;
-
-  let rating = 0;
-  if (asset.pvp > 0 && asset.pvp < 1) rating++;
-  if (monthlyProfitability > 0.80) rating++;
-  if (priceVariation < 0) rating++;
-  // Map 0-3 criteria to 1-5 stars
-  if (rating === 3) rating = 5;
-  else if (rating === 2) rating = 4;
-  else if (rating === 1) rating = 3;
-  else rating = 2;
-
   const portfolioProportion = totalPortfolio > 0 ? (totalCurrent / totalPortfolio) * 100 : 0;
   const totalVariationPerShare = priceVariation * asset.quantity;
+
+  const breakdown = computeRating(
+    {
+      pvp: asset.pvp,
+      monthlyProfitability,
+      priceVariation,
+      averagePrice: asset.averagePrice,
+      difference,
+      totalInvested: asset.totalInvested,
+      portfolioProportion,
+      dividendMonthsLast12: ctx?.dividendMonthsLast12 ?? 0,
+    },
+    settings,
+  );
 
   return {
     ...asset,
@@ -25,7 +34,9 @@ export function calculateAsset(asset: Asset, totalPortfolio: number): AssetCalcu
     difference,
     monthlyProfitability,
     priceVariation,
-    rating,
+    rating: breakdown.stars,
+    ratingScore: breakdown.total,
+    ratingBreakdown: breakdown,
     portfolioProportion,
     totalVariationPerShare,
   };

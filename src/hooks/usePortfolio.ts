@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { Asset, AssetCalculated, Transaction } from "@/types/portfolio";
 import { calculateAsset, parseCSV } from "@/lib/portfolio";
+import { useRatingSettings } from "@/hooks/useRatingSettings";
+import { useDividends } from "@/hooks/useDividends";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -99,6 +101,8 @@ function rowToTransaction(row: any): Transaction {
 export function usePortfolio() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { settings: ratingSettings } = useRatingSettings();
+  const { dividends } = useDividends();
   const [baseAssets, setBaseAssets] = useState<Asset[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,7 +136,30 @@ export function usePortfolio() {
   const assets = useMemo(() => applyTransactions(baseAssets, transactions), [baseAssets, transactions]);
 
   const totalPortfolio = assets.reduce((sum, a) => sum + a.quantity * a.currentPrice, 0);
-  const calculatedAssets: AssetCalculated[] = assets.map((a) => calculateAsset(a, totalPortfolio));
+
+  // Months with at least one dividend in the last 12 calendar months, per ticker.
+  const dividendMonthsByTicker = useMemo(() => {
+    const now = new Date();
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const map: Record<string, Set<string>> = {};
+    for (const d of dividends) {
+      const dt = new Date(d.payment_date);
+      if (isNaN(dt.getTime()) || dt < cutoff) continue;
+      const key = `${d.year}-${d.month}`;
+      const t = d.ticker.toUpperCase();
+      if (!map[t]) map[t] = new Set();
+      map[t].add(key);
+    }
+    const out: Record<string, number> = {};
+    for (const [t, set] of Object.entries(map)) out[t] = set.size;
+    return out;
+  }, [dividends]);
+
+  const calculatedAssets: AssetCalculated[] = assets.map((a) =>
+    calculateAsset(a, totalPortfolio, ratingSettings, {
+      dividendMonthsLast12: dividendMonthsByTicker[a.ticker.toUpperCase()] ?? 0,
+    }),
+  );
 
   const addAsset = useCallback(async (asset: Omit<Asset, "id">) => {
     if (!user) return;
