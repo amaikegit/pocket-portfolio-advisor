@@ -25,9 +25,10 @@ const fmt = (v: number) =>
 interface Props {
   onAdd: (tx: Omit<Transaction, "id">) => void;
   existingTickers: string[];
+  trigger?: React.ReactNode;
 }
 
-export function AddTransactionDialog({ onAdd, existingTickers }: Props) {
+export function AddTransactionDialog({ onAdd, existingTickers, trigger }: Props) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<TransactionType>("buy");
   const [assetType, setAssetType] = useState<AssetType>("acoes");
