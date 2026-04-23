@@ -1,9 +1,7 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useDividends, Dividend, DividendInput } from "@/hooks/useDividends";
 import { CSVImportDividendsDialog } from "@/components/CSVImportDividendsDialog";
 import { usePortfolio } from "@/hooks/usePortfolio";
-import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,8 +12,8 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, Legend } from "recharts";
-import { BarChart3, Plus, ArrowLeft, LogOut, DollarSign, TrendingUp, Calendar, Loader2, Trash2, Pencil, Filter, ArrowUpDown, ChevronDown, ChevronRight } from "lucide-react";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { Plus, DollarSign, TrendingUp, Calendar, Loader2, Trash2, Pencil, Filter, ArrowUpDown, ChevronDown, ChevronRight } from "lucide-react";
+import { AppLayout } from "@/components/AppLayout";
 
 import { AccumulatedDividendsChart } from "@/components/dividends/AccumulatedDividendsChart";
 import { AssetDividendEvolution } from "@/components/dividends/AssetDividendEvolution";
