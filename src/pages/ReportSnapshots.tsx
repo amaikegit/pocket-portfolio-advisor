@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, ArrowDownRight, ArrowUpRight, Minus, Loader2, History, Trash2, RefreshCw } from "lucide-react";
@@ -57,7 +56,6 @@ function DeltaBadge({ value, type }: { value: number | null; type: "currency" | 
 }
 
 const ReportSnapshots = () => {
-  const navigate = useNavigate();
   const [snapshots, setSnapshots] = useState<ReportSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [from, setFrom] = useState<Date | undefined>();
