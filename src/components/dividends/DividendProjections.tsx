@@ -21,14 +21,13 @@ export function DividendProjections({ dividends, assets, rawAssets }: Props) {
   const totalInvested = assets.reduce((s, a) => s + a.totalInvested, 0);
   const totalDividends = dividends.reduce((s, d) => s + d.amount, 0);
 
-  // Projected monthly income based on current DY
+  // Projected monthly income.
+  // Convention used across the app: `dividendYield` is the **monthly** dividend per share in R$
+  // (see `usePortfolio.totals.totalMonthlyDY` and `monthlyProfitability` in `lib/portfolio.ts`).
+  // So monthly income per asset = dividendYield (R$/cota) * quantity.
   const monthlyDYIncome = useMemo(() => {
-    return rawAssets.reduce((s, a) => {
-      const asset = assets.find((ca) => ca.ticker === a.ticker);
-      if (!asset) return s;
-      return s + (a.dividendYield / 100 / 12) * asset.totalCurrent;
-    }, 0);
-  }, [rawAssets, assets]);
+    return rawAssets.reduce((s, a) => s + (a.dividendYield || 0) * (a.quantity || 0), 0);
+  }, [rawAssets]);
 
   // 12-month projection
   const projection12m = useMemo(() => {
