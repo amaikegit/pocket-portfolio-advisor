@@ -237,46 +237,29 @@ const Dividends = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-md bg-primary/20 flex items-center justify-center">
-              <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
-            </div>
-            <h1 className="font-mono-display text-base sm:text-lg font-bold tracking-tight">
-              Portfolio<span className="text-primary">Tracker</span>
-            </h1>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => navigate("/")}>
-              <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Voltar</span>
+    <AppLayout
+      title={<><span className="text-primary">Dividendos</span></>}
+      assets={assets}
+    >
+      {/* Page-specific actions */}
+      <div className="flex flex-wrap justify-end gap-2">
+        <CSVImportDividendsDialog onImport={bulkImportDividends} />
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Adicionar Dividendo</span>
             </Button>
-            <CSVImportDividendsDialog onImport={bulkImportDividends} />
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">Adicionar Dividendo</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Registrar Dividendo</DialogTitle>
-                </DialogHeader>
-                {formFieldsJSX}
-                <Button className="w-full" onClick={handleAdd}>Salvar</Button>
-              </DialogContent>
-            </Dialog>
-            <ThemeToggle />
-            <Button variant="ghost" size="icon" onClick={signOut} title="Sair">
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Registrar Dividendo</DialogTitle>
+            </DialogHeader>
+            {formFieldsJSX}
+            <Button className="w-full" onClick={handleAdd}>Salvar</Button>
+          </DialogContent>
+        </Dialog>
+      </div>
 
       {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) { resetForm(); setEditingDividend(null); } }}>
@@ -288,8 +271,6 @@ const Dividends = () => {
           <Button className="w-full" onClick={handleEditSave}>Atualizar</Button>
         </DialogContent>
       </Dialog>
-
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-6">
         {/* Summary Cards */}
         {(() => {
           const currentMonth = new Date().getMonth() + 1;
