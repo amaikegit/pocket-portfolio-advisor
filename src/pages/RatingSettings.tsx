@@ -69,30 +69,18 @@ export default function RatingSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Voltar">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <h1 className="font-mono-display text-base sm:text-lg font-bold">
-              Configurações de <span className="text-primary">Rating</span>
-            </h1>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => setDraft(DEFAULT_RATING_SETTINGS)}>
-              <RotateCcw className="h-4 w-4" /> Restaurar padrão
-            </Button>
-            <Button className="gap-2" onClick={() => save(draft)} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Salvar
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-6">
+    <AppLayout
+      title={<>Configurações de <span className="text-primary">Rating</span></>}
+    >
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="outline" className="gap-2" onClick={() => setDraft(DEFAULT_RATING_SETTINGS)}>
+          <RotateCcw className="h-4 w-4" /> Restaurar padrão
+        </Button>
+        <Button className="gap-2" onClick={() => save(draft)} disabled={saving}>
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Salvar
+        </Button>
+      </div>
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center justify-between">
@@ -226,8 +214,7 @@ export default function RatingSettingsPage() {
             )}
           </CardContent>
         </Card>
-      </main>
-    </div>
+    </AppLayout>
   );
 }
 
