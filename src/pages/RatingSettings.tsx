@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, RotateCcw, Save, Loader2 } from "lucide-react";
+import { RotateCcw, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -12,6 +11,7 @@ import { useRatingSettings } from "@/hooks/useRatingSettings";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { computeRating, DEFAULT_RATING_SETTINGS, RatingSettings } from "@/lib/rating";
 import { RatingCriterionKey } from "@/types/portfolio";
+import { AppLayout } from "@/components/AppLayout";
 
 const CRITERIA: { key: RatingCriterionKey; label: string; description: string }[] = [
   { key: "valuation",           label: "Valuation (P/VP)",          description: "Quanto menor o P/VP, mais barato o ativo está em relação ao patrimônio." },
@@ -23,7 +23,6 @@ const CRITERIA: { key: RatingCriterionKey; label: string; description: string }[
 ];
 
 export default function RatingSettingsPage() {
-  const navigate = useNavigate();
   const { settings, save, resetDefaults, loading, saving } = useRatingSettings();
   const { calculatedAssets } = usePortfolio();
   const [draft, setDraft] = useState<RatingSettings>(settings);
