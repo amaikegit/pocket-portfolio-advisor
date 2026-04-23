@@ -308,8 +308,7 @@ const ReportSnapshots = () => {
             )}
           </CardContent>
         </Card>
-      </main>
-    </div>
+    </AppLayout>
   );
 };
 
