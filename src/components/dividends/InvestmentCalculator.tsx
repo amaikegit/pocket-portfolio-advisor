@@ -70,8 +70,16 @@ export function InvestmentCalculator({ defaultInitial = 0, defaultRate = 0 }: Pr
       investimentoContinuo,
       jurosObtidos,
       valorFinal,
+      nMonths,
     };
   }, [initial, rate, monthly, months]);
+
+  const finalDate = useMemo(() => {
+    if (!result) return null;
+    const d = new Date();
+    d.setMonth(d.getMonth() + result.nMonths);
+    return d.toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
+  }, [result]);
 
   return (
     <Card>
@@ -157,6 +165,11 @@ export function InvestmentCalculator({ defaultInitial = 0, defaultRate = 0 }: Pr
                   Valor Final
                 </div>
                 <p className="text-xl font-mono font-bold text-primary">{formatBRL(result.valorFinal)}</p>
+                {finalDate && (
+                  <p className="text-[10px] text-muted-foreground mt-1 font-mono">
+                    em {finalDate}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>

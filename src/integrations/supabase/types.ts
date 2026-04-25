@@ -92,6 +92,8 @@ export type Database = {
           created_at: string
           current_price: number
           dividend_yield: number
+          fii_segment: string | null
+          fii_type: string | null
           id: string
           is_manual_price: boolean
           pvp: number
@@ -106,6 +108,8 @@ export type Database = {
           created_at?: string
           current_price?: number
           dividend_yield?: number
+          fii_segment?: string | null
+          fii_type?: string | null
           id?: string
           is_manual_price?: boolean
           pvp?: number
@@ -120,6 +124,8 @@ export type Database = {
           created_at?: string
           current_price?: number
           dividend_yield?: number
+          fii_segment?: string | null
+          fii_type?: string | null
           id?: string
           is_manual_price?: boolean
           pvp?: number

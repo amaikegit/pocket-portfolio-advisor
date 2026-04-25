@@ -81,6 +81,8 @@ function rowToAsset(row: any): Asset {
     totalInvested: Number(row.total_invested),
     dividendYield: Number(row.dividend_yield),
     pvp: Number(row.pvp),
+    fiiType: row.fii_type ?? null,
+    fiiSegment: row.fii_segment ?? null,
   };
 }
 
@@ -173,6 +175,8 @@ export function usePortfolio() {
       total_invested: asset.totalInvested,
       dividend_yield: asset.dividendYield,
       pvp: asset.pvp,
+      fii_type: asset.fiiType ?? null,
+      fii_segment: asset.fiiSegment ?? null,
     }).select().single();
     if (error) { toast({ title: "Erro ao adicionar ativo", description: error.message, variant: "destructive" }); return; }
     if (data) setBaseAssets((prev) => [...prev, rowToAsset(data)]);
@@ -188,6 +192,8 @@ export function usePortfolio() {
     if (updates.totalInvested !== undefined) dbUpdates.total_invested = updates.totalInvested;
     if (updates.dividendYield !== undefined) dbUpdates.dividend_yield = updates.dividendYield;
     if (updates.pvp !== undefined) dbUpdates.pvp = updates.pvp;
+    if (updates.fiiType !== undefined) dbUpdates.fii_type = updates.fiiType;
+    if (updates.fiiSegment !== undefined) dbUpdates.fii_segment = updates.fiiSegment;
     dbUpdates.updated_at = new Date().toISOString();
 
     const { error } = await supabase.from("assets").update(dbUpdates).eq("id", id);

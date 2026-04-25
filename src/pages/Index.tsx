@@ -3,6 +3,7 @@ import { usePortfolio } from "@/hooks/usePortfolio";
 import { PortfolioTable } from "@/components/PortfolioTable";
 import { SummaryCards } from "@/components/SummaryCards";
 import { PortfolioCharts } from "@/components/PortfolioCharts";
+import { FIIBreakdownCharts } from "@/components/FIIBreakdownCharts";
 import { PortfolioEvolution } from "@/components/PortfolioEvolution";
 import { PortfolioSnapshots } from "@/components/PortfolioSnapshots";
 import { AlertsPanel } from "@/components/AlertsPanel";
@@ -41,6 +42,7 @@ const Index = () => {
       <AIReportsHistory />
       <PortfolioEvolution assets={assets} />
       <PortfolioCharts assets={calculatedAssets} />
+      <FIIBreakdownCharts assets={calculatedAssets} />
       <PortfolioTable assets={calculatedAssets} onRemove={removeAsset} onUpdate={updateAsset} />
     </AppLayout>
   );
