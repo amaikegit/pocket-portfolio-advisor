@@ -11,6 +11,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { FII_TYPES, FII_SEGMENTS, isFiiTicker, suggestClassification } from "@/lib/fiiClassification";
 import type { Asset } from "@/types/portfolio";
 
 interface AddAssetDialogProps {
@@ -27,6 +31,8 @@ const defaultAsset = {
   totalInvested: 0,
   dividendYield: 0,
   pvp: 0,
+  fiiType: "" as string,
+  fiiSegment: "" as string,
 };
 
 export function AddAssetDialog({ onAdd, trigger }: AddAssetDialogProps) {
@@ -36,13 +42,35 @@ export function AddAssetDialog({ onAdd, trigger }: AddAssetDialogProps) {
   const set = (key: string, value: string | number | boolean) =>
     setForm((f) => ({ ...f, [key]: value }));
 
+  const onTickerChange = (value: string) => {
+    const upper = value.toUpperCase();
+    setForm((f) => {
+      const next = { ...f, ticker: value };
+      if (isFiiTicker(upper) && !f.fiiType && !f.fiiSegment) {
+        const sug = suggestClassification(upper);
+        if (sug) {
+          next.fiiType = sug.type;
+          next.fiiSegment = sug.segment;
+        }
+      }
+      return next;
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.ticker.trim()) return;
-    onAdd({ ...form, ticker: form.ticker.toUpperCase().trim() });
+    onAdd({
+      ...form,
+      ticker: form.ticker.toUpperCase().trim(),
+      fiiType: form.fiiType || null,
+      fiiSegment: form.fiiSegment || null,
+    });
     setForm(defaultAsset);
     setOpen(false);
   };
+
+  const showFiiFields = isFiiTicker(form.ticker);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -62,7 +90,7 @@ export function AddAssetDialog({ onAdd, trigger }: AddAssetDialogProps) {
           <div className="space-y-1.5">
             <Label htmlFor="ticker">Ticker</Label>
             <Input id="ticker" placeholder="HGLG11" value={form.ticker}
-              onChange={(e) => set("ticker", e.target.value)} />
+              onChange={(e) => onTickerChange(e.target.value)} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="quantity">Quantidade de Cotas</Label>
@@ -99,6 +127,28 @@ export function AddAssetDialog({ onAdd, trigger }: AddAssetDialogProps) {
             <Input id="pvp" type="number" step="0.01" value={form.pvp || ""}
               onChange={(e) => set("pvp", Number(e.target.value))} />
           </div>
+          {showFiiFields && (
+            <>
+              <div className="space-y-1.5">
+                <Label>Tipo (FII)</Label>
+                <Select value={form.fiiType} onValueChange={(v) => set("fiiType", v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
+                  <SelectContent>
+                    {FII_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Segmento (FII)</Label>
+                <Select value={form.fiiSegment} onValueChange={(v) => set("fiiSegment", v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
+                  <SelectContent>
+                    {FII_SEGMENTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
           <div className="col-span-2 flex justify-end pt-2">
             <Button type="submit">Adicionar</Button>
           </div>
