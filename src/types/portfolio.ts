@@ -8,6 +8,8 @@ export interface Asset {
   totalInvested: number;
   dividendYield: number;
   pvp: number;
+  fiiType?: string | null;
+  fiiSegment?: string | null;
 }
 
 export interface AssetCalculated extends Asset {
