@@ -312,6 +312,14 @@ export function PortfolioBenchmark() {
                 >
                   % acum.
                 </Button>
+                <Button
+                  variant={mode === "abs" ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setMode("abs")}
+                >
+                  R$
+                </Button>
               </div>
             </div>
           )}
