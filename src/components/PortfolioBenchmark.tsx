@@ -126,14 +126,17 @@ function normalize(series: Point[], mode: Mode): Point[] {
 
 const CustomTooltip = ({ active, payload, label, mode }: any) => {
   if (!active || !payload?.length) return null;
+  const fmt = (v: number) => {
+    if (mode === "base100") return v.toFixed(2);
+    if (mode === "pct") return `${v.toFixed(2)}%`;
+    return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
+  };
   return (
     <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs shadow-md">
       <p className="font-semibold text-foreground mb-1">{label}</p>
       {payload.map((p: any, i: number) => (
         <p key={i} style={{ color: p.color }}>
-          {p.name}: {typeof p.value === "number"
-            ? mode === "base100" ? p.value.toFixed(2) : `${p.value.toFixed(2)}%`
-            : "—"}
+          {p.name}: {typeof p.value === "number" ? fmt(p.value) : "—"}
         </p>
       ))}
     </div>
