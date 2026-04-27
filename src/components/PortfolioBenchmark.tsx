@@ -157,7 +157,6 @@ export function PortfolioBenchmark() {
               .from("portfolio_snapshots")
               .select("snapshot_date,total_current")
               .eq("user_id", user.id)
-              .gte("snapshot_date", rangeStart(period).toISOString().slice(0, 10))
               .order("snapshot_date", { ascending: true })
           : Promise.resolve({ data: [] as any, error: null }),
         user
