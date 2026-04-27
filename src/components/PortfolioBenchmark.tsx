@@ -13,7 +13,7 @@ import { Transaction } from "@/types/portfolio";
 import { fetchAllPaginated } from "@/lib/supabasePagination";
 
 type IndexId = "cdi" | "ipca" | "ifix" | "ibov";
-type Mode = "base100" | "pct";
+type Mode = "base100" | "pct" | "abs";
 
 const INDICES: { id: IndexId; label: string; color: string }[] = [
   { id: "cdi", label: "CDI", color: "hsl(38, 90%, 55%)" },
