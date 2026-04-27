@@ -108,6 +108,12 @@ function buildPortfolioSeries(
 
 function normalize(series: Point[], mode: Mode): Point[] {
   if (series.length === 0) return [];
+  if (mode === "abs") {
+    return series.map((p) => ({
+      date: p.date,
+      value: Math.round(p.value * 100) / 100,
+    }));
+  }
   const base = series[0].value;
   if (!base) return [];
   return series.map((p) => ({
