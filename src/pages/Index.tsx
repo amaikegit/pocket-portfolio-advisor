@@ -5,6 +5,7 @@ import { SummaryCards } from "@/components/SummaryCards";
 import { PortfolioCharts } from "@/components/PortfolioCharts";
 import { FIIBreakdownCharts } from "@/components/FIIBreakdownCharts";
 import { PortfolioEvolution } from "@/components/PortfolioEvolution";
+import { PortfolioBenchmark } from "@/components/PortfolioBenchmark";
 import { PortfolioSnapshots } from "@/components/PortfolioSnapshots";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { AIReportsHistory } from "@/components/AIReportsHistory";
@@ -41,6 +42,7 @@ const Index = () => {
       <PortfolioSnapshots />
       <AIReportsHistory />
       <PortfolioEvolution assets={assets} />
+      <PortfolioBenchmark />
       <PortfolioCharts assets={calculatedAssets} />
       <FIIBreakdownCharts assets={calculatedAssets} />
       <PortfolioTable assets={calculatedAssets} onRemove={removeAsset} onUpdate={updateAsset} />
