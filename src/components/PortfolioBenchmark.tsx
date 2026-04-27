@@ -13,7 +13,7 @@ import { Transaction } from "@/types/portfolio";
 import { fetchAllPaginated } from "@/lib/supabasePagination";
 
 type IndexId = "cdi" | "ipca" | "ifix" | "ibov";
-type Mode = "base100" | "pct";
+type Mode = "base100" | "pct" | "abs";
 
 const INDICES: { id: IndexId; label: string; color: string }[] = [
   { id: "cdi", label: "CDI", color: "hsl(38, 90%, 55%)" },
@@ -108,6 +108,12 @@ function buildPortfolioSeries(
 
 function normalize(series: Point[], mode: Mode): Point[] {
   if (series.length === 0) return [];
+  if (mode === "abs") {
+    return series.map((p) => ({
+      date: p.date,
+      value: Math.round(p.value * 100) / 100,
+    }));
+  }
   const base = series[0].value;
   if (!base) return [];
   return series.map((p) => ({
@@ -120,14 +126,17 @@ function normalize(series: Point[], mode: Mode): Point[] {
 
 const CustomTooltip = ({ active, payload, label, mode }: any) => {
   if (!active || !payload?.length) return null;
+  const fmt = (v: number) => {
+    if (mode === "base100") return v.toFixed(2);
+    if (mode === "pct") return `${v.toFixed(2)}%`;
+    return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 });
+  };
   return (
     <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs shadow-md">
       <p className="font-semibold text-foreground mb-1">{label}</p>
       {payload.map((p: any, i: number) => (
         <p key={i} style={{ color: p.color }}>
-          {p.name}: {typeof p.value === "number"
-            ? mode === "base100" ? p.value.toFixed(2) : `${p.value.toFixed(2)}%`
-            : "—"}
+          {p.name}: {typeof p.value === "number" ? fmt(p.value) : "—"}
         </p>
       ))}
     </div>
@@ -257,7 +266,13 @@ export function PortfolioBenchmark() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
-  const yFormatter = (v: number) => (mode === "base100" ? v.toFixed(0) : `${v.toFixed(0)}%`);
+  const yFormatter = (v: number) => {
+    if (mode === "base100") return v.toFixed(0);
+    if (mode === "pct") return `${v.toFixed(0)}%`;
+    if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1)}M`;
+    if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(1)}k`;
+    return `R$ ${v.toFixed(0)}`;
+  };
 
   return (
     <Card className="bg-card border-border">
@@ -302,6 +317,14 @@ export function PortfolioBenchmark() {
                   onClick={() => setMode("pct")}
                 >
                   % acum.
+                </Button>
+                <Button
+                  variant={mode === "abs" ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setMode("abs")}
+                >
+                  R$
                 </Button>
               </div>
             </div>
