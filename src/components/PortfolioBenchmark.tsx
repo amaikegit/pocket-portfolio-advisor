@@ -266,7 +266,13 @@ export function PortfolioBenchmark() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
-  const yFormatter = (v: number) => (mode === "base100" ? v.toFixed(0) : `${v.toFixed(0)}%`);
+  const yFormatter = (v: number) => {
+    if (mode === "base100") return v.toFixed(0);
+    if (mode === "pct") return `${v.toFixed(0)}%`;
+    if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1)}M`;
+    if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(1)}k`;
+    return `R$ ${v.toFixed(0)}`;
+  };
 
   return (
     <Card className="bg-card border-border">
