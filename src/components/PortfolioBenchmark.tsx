@@ -384,12 +384,22 @@ export function PortfolioBenchmark() {
                     checked={selected.has(idx.id)}
                     onCheckedChange={() => toggleIndex(idx.id)}
                     className="h-3.5 w-3.5"
+                    disabled={mode === "abs"}
                   />
-                  <label htmlFor={`bench-${idx.id}`} className="text-xs cursor-pointer" style={{ color: idx.color }}>
+                  <label
+                    htmlFor={`bench-${idx.id}`}
+                    className={`text-xs cursor-pointer ${mode === "abs" ? "opacity-40" : ""}`}
+                    style={{ color: idx.color }}
+                  >
                     {idx.label}
                   </label>
                 </div>
               ))}
+              {mode === "abs" && (
+                <span className="text-[10px] text-muted-foreground italic">
+                  No modo R$, apenas a Carteira é exibida (índices têm escalas diferentes — use Base 100 ou % para comparar).
+                </span>
+              )}
             </div>
 
             <ResponsiveContainer width="100%" height={350}>
@@ -421,7 +431,7 @@ export function PortfolioBenchmark() {
                     connectNulls
                   />
                 )}
-                {INDICES.filter((i) => selected.has(i.id)).map((i) => (
+                {mode !== "abs" && INDICES.filter((i) => selected.has(i.id)).map((i) => (
                   <Line
                     key={i.id}
                     type="monotone"
