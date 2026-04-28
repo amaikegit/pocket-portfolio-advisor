@@ -209,18 +209,27 @@ export function PortfolioBenchmark() {
     for (const id of selected) {
       for (const p of indexData[id] ?? []) allDates.add(p.date);
     }
-    if (showPortfolio) {
-      // Use index dates as the master timeline; portfolio is sampled on those dates.
+    // If we're in absolute mode, indices are hidden — make sure we still have a
+    // timeline by using snapshot/transaction dates from the portfolio itself.
+    if (mode === "abs" && showPortfolio) {
+      for (const s of snapshots) allDates.add(s.snapshot_date);
+      for (const t of transactions) allDates.add(t.date);
     }
     const sortedDates = Array.from(allDates).sort();
 
+    // In absolute mode we only render the Carteira line (indices are on totally
+    // different scales — points, base 1, etc — so mixing them flattens the chart).
+    const showIndices = mode !== "abs";
+
     // Normalize each index series
     const normalizedIdx: Record<string, Map<string, number>> = {};
-    for (const id of selected) {
-      const norm = normalize(indexData[id] ?? [], mode);
-      const m = new Map<string, number>();
-      for (const p of norm) m.set(p.date, p.value);
-      normalizedIdx[id] = m;
+    if (showIndices) {
+      for (const id of selected) {
+        const norm = normalize(indexData[id] ?? [], mode);
+        const m = new Map<string, number>();
+        for (const p of norm) m.set(p.date, p.value);
+        normalizedIdx[id] = m;
+      }
     }
 
     // Portfolio series sampled on master timeline
@@ -231,16 +240,27 @@ export function PortfolioBenchmark() {
       for (const p of norm) portfolioMap.set(p.date, p.value);
     }
 
+    // Trim leading dates where nothing is plottable yet (avoids the flat-zero
+    // segment before the first portfolio data point when only Carteira is shown).
+    let firstValidIdx = 0;
+    if (mode === "abs") {
+      firstValidIdx = sortedDates.findIndex((d) => portfolioMap.has(d));
+      if (firstValidIdx < 0) firstValidIdx = sortedDates.length;
+    }
+    const visibleDates = sortedDates.slice(firstValidIdx);
+
     // Forward-fill across date timeline
     const lastIdx: Record<string, number | undefined> = {};
     let lastPort: number | undefined;
 
-    return sortedDates.map((d) => {
+    return visibleDates.map((d) => {
       const row: Record<string, any> = { date: fmtDate(d) };
-      for (const id of selected) {
-        const v = normalizedIdx[id].get(d);
-        if (v !== undefined) lastIdx[id] = v;
-        if (lastIdx[id] !== undefined) row[id.toUpperCase()] = lastIdx[id];
+      if (showIndices) {
+        for (const id of selected) {
+          const v = normalizedIdx[id]?.get(d);
+          if (v !== undefined) lastIdx[id] = v;
+          if (lastIdx[id] !== undefined) row[INDICES.find((i) => i.id === id)!.label] = lastIdx[id];
+        }
       }
       if (showPortfolio) {
         const v = portfolioMap.get(d);
@@ -364,12 +384,22 @@ export function PortfolioBenchmark() {
                     checked={selected.has(idx.id)}
                     onCheckedChange={() => toggleIndex(idx.id)}
                     className="h-3.5 w-3.5"
+                    disabled={mode === "abs"}
                   />
-                  <label htmlFor={`bench-${idx.id}`} className="text-xs cursor-pointer" style={{ color: idx.color }}>
+                  <label
+                    htmlFor={`bench-${idx.id}`}
+                    className={`text-xs cursor-pointer ${mode === "abs" ? "opacity-40" : ""}`}
+                    style={{ color: idx.color }}
+                  >
                     {idx.label}
                   </label>
                 </div>
               ))}
+              {mode === "abs" && (
+                <span className="text-[10px] text-muted-foreground italic">
+                  No modo R$, apenas a Carteira é exibida (índices têm escalas diferentes — use Base 100 ou % para comparar).
+                </span>
+              )}
             </div>
 
             <ResponsiveContainer width="100%" height={350}>
@@ -401,7 +431,7 @@ export function PortfolioBenchmark() {
                     connectNulls
                   />
                 )}
-                {INDICES.filter((i) => selected.has(i.id)).map((i) => (
+                {mode !== "abs" && INDICES.filter((i) => selected.has(i.id)).map((i) => (
                   <Line
                     key={i.id}
                     type="monotone"
