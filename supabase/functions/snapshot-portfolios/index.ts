@@ -82,8 +82,15 @@ serve(async (req) => {
       const k = `${a.user_id}::${a.ticker}`;
       seen.add(k);
       const tx = txMap.get(k);
-      const qty = tx ? tx.qty : Number(a.quantity);
-      const invested = tx ? tx.cost : Number(a.total_invested);
+      // Trust the asset row's quantity/cost when transactions are incomplete
+      // (e.g. user imported positions via CSV without a full historical tx log).
+      // Only use transaction-derived numbers when they meet or exceed the asset
+      // row, which signals that the tx history is the authoritative source.
+      const assetQty = Number(a.quantity);
+      const assetInvested = Number(a.total_invested);
+      const useTx = tx && tx.qty >= assetQty && tx.qty > 0;
+      const qty = useTx ? tx!.qty : assetQty;
+      const invested = useTx ? tx!.cost : assetInvested;
       const cur = perUser.get(a.user_id) ?? { current: 0, invested: 0 };
       cur.current += qty * Number(a.current_price);
       cur.invested += invested;
