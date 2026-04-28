@@ -14,6 +14,7 @@ import { fetchAllPaginated } from "@/lib/supabasePagination";
 
 type IndexId = "cdi" | "ipca" | "ifix" | "ibov";
 type Mode = "base100" | "pct" | "abs";
+type AbsScale = "hide" | "rescale";
 
 const INDICES: { id: IndexId; label: string; color: string }[] = [
   { id: "cdi", label: "CDI", color: "hsl(38, 90%, 55%)" },
@@ -147,6 +148,7 @@ export function PortfolioBenchmark() {
   const { user } = useAuth();
   const [period, setPeriod] = useState("6mo");
   const [mode, setMode] = useState<Mode>("base100");
+  const [absScale, setAbsScale] = useState<AbsScale>("hide");
   const [selected, setSelected] = useState<Set<IndexId>>(new Set(["cdi", "ifix", "ibov"]));
   const [showPortfolio, setShowPortfolio] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -217,27 +219,50 @@ export function PortfolioBenchmark() {
     }
     const sortedDates = Array.from(allDates).sort();
 
-    // In absolute mode we only render the Carteira line (indices are on totally
-    // different scales — points, base 1, etc — so mixing them flattens the chart).
-    const showIndices = mode !== "abs";
-
-    // Normalize each index series
-    const normalizedIdx: Record<string, Map<string, number>> = {};
-    if (showIndices) {
-      for (const id of selected) {
-        const norm = normalize(indexData[id] ?? [], mode);
-        const m = new Map<string, number>();
-        for (const p of norm) m.set(p.date, p.value);
-        normalizedIdx[id] = m;
-      }
-    }
+    // In absolute mode, indices are either hidden or rescaled to the portfolio's
+    // starting value (so every line shares the same R$ base and stays visually
+    // comparable). In other modes indices always render normally.
+    const showIndices = mode !== "abs" || absScale === "rescale";
+    const rescaleAbs = mode === "abs" && absScale === "rescale";
 
     // Portfolio series sampled on master timeline
     let portfolioMap = new Map<string, number>();
+    let portfolioRawMap = new Map<string, number>();
+    let portfolioBaseValue: number | undefined;
     if (showPortfolio && sortedDates.length > 0) {
       const portfolioRaw = buildPortfolioSeries(snapshots, transactions, sortedDates);
+      for (const p of portfolioRaw) portfolioRawMap.set(p.date, p.value);
+      portfolioBaseValue = portfolioRaw[0]?.value;
       const norm = normalize(portfolioRaw, mode);
       for (const p of norm) portfolioMap.set(p.date, p.value);
+    }
+
+    // Normalize each index series (after portfolio so we can rescale to its base)
+    const normalizedIdx: Record<string, Map<string, number>> = {};
+    if (showIndices) {
+      for (const id of selected) {
+        const raw = indexData[id] ?? [];
+        let series: Point[];
+        if (rescaleAbs) {
+          // Rescale: index starts at the same R$ value as the portfolio,
+          // then evolves by its own returns (base-100 ratio * portfolio base).
+          const base = raw[0]?.value;
+          const portBase = portfolioBaseValue;
+          if (!base || !portBase) {
+            series = [];
+          } else {
+            series = raw.map((p) => ({
+              date: p.date,
+              value: Math.round((p.value / base) * portBase * 100) / 100,
+            }));
+          }
+        } else {
+          series = normalize(raw, mode);
+        }
+        const m = new Map<string, number>();
+        for (const p of series) m.set(p.date, p.value);
+        normalizedIdx[id] = m;
+      }
     }
 
     // Trim leading dates where nothing is plottable yet (avoids the flat-zero
@@ -269,7 +294,7 @@ export function PortfolioBenchmark() {
       }
       return row;
     });
-  }, [indexData, selected, mode, showPortfolio, snapshots, transactions]);
+  }, [indexData, selected, mode, absScale, showPortfolio, snapshots, transactions]);
 
   const toggleIndex = (id: IndexId) => {
     setSelected((prev) => {
