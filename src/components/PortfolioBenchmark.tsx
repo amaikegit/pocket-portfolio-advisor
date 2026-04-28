@@ -372,6 +372,26 @@ export function PortfolioBenchmark() {
                   R$
                 </Button>
               </div>
+              {mode === "abs" && (
+                <div className="ml-2 flex gap-1">
+                  <Button
+                    variant={absScale === "hide" ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setAbsScale("hide")}
+                  >
+                    Ocultar índices
+                  </Button>
+                  <Button
+                    variant={absScale === "rescale" ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setAbsScale("rescale")}
+                  >
+                    Reescalar à carteira
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -409,20 +429,25 @@ export function PortfolioBenchmark() {
                     checked={selected.has(idx.id)}
                     onCheckedChange={() => toggleIndex(idx.id)}
                     className="h-3.5 w-3.5"
-                    disabled={mode === "abs"}
+                    disabled={mode === "abs" && absScale === "hide"}
                   />
                   <label
                     htmlFor={`bench-${idx.id}`}
-                    className={`text-xs cursor-pointer ${mode === "abs" ? "opacity-40" : ""}`}
+                    className={`text-xs cursor-pointer ${mode === "abs" && absScale === "hide" ? "opacity-40" : ""}`}
                     style={{ color: idx.color }}
                   >
                     {idx.label}
                   </label>
                 </div>
               ))}
-              {mode === "abs" && (
+              {mode === "abs" && absScale === "hide" && (
                 <span className="text-[10px] text-muted-foreground italic">
                   No modo R$, apenas a Carteira é exibida (índices têm escalas diferentes — use Base 100 ou % para comparar).
+                </span>
+              )}
+              {mode === "abs" && absScale === "rescale" && (
+                <span className="text-[10px] text-muted-foreground italic">
+                  Índices reescalados ao valor inicial da carteira (mesma base em R$, evolução proporcional).
                 </span>
               )}
             </div>
@@ -456,7 +481,7 @@ export function PortfolioBenchmark() {
                     connectNulls
                   />
                 )}
-                {mode !== "abs" && INDICES.filter((i) => selected.has(i.id)).map((i) => (
+                {(mode !== "abs" || absScale === "rescale") && INDICES.filter((i) => selected.has(i.id)).map((i) => (
                   <Line
                     key={i.id}
                     type="monotone"
