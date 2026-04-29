@@ -54,7 +54,7 @@ export default function RatingSettingsPage() {
   const previewAssets = useMemo(() => {
     if (calculatedAssets.length === 0) return [];
     const sorted = [...calculatedAssets].sort((a, b) => b.totalCurrent - a.totalCurrent);
-    return sorted.slice(0, 3);
+    return sorted.slice(0, 6);
   }, [calculatedAssets]);
 
   const setWeight = (key: RatingCriterionKey, value: number) =>
