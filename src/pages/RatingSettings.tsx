@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { RotateCcw, Save, Loader2 } from "lucide-react";
+import { RotateCcw, Save, Loader2, Sparkles, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -8,10 +8,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { StarRating } from "@/components/StarRating";
 import { useRatingSettings } from "@/hooks/useRatingSettings";
+import { useRatingPresets } from "@/hooks/useRatingPresets";
 import { usePortfolio } from "@/hooks/usePortfolio";
-import { computeRating, DEFAULT_RATING_SETTINGS, RatingSettings } from "@/lib/rating";
+import {
+  computeRating,
+  DEFAULT_RATING_SETTINGS,
+  RatingSettings,
+  STRATEGY_PRESETS,
+} from "@/lib/rating";
 import { RatingCriterionKey } from "@/types/portfolio";
 import { AppLayout } from "@/components/AppLayout";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 const CRITERIA: { key: RatingCriterionKey; label: string; description: string }[] = [
   { key: "valuation",           label: "Valuation (P/VP)",          description: "Quanto menor o P/VP, mais barato o ativo está em relação ao patrimônio." },
@@ -24,8 +38,11 @@ const CRITERIA: { key: RatingCriterionKey; label: string; description: string }[
 
 export default function RatingSettingsPage() {
   const { settings, save, resetDefaults, loading, saving } = useRatingSettings();
+  const { presets: customPresets, savePreset, deletePreset } = useRatingPresets();
   const { calculatedAssets } = usePortfolio();
   const [draft, setDraft] = useState<RatingSettings>(settings);
+  const [presetName, setPresetName] = useState("");
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   useEffect(() => { setDraft(settings); }, [settings]);
 
@@ -81,6 +98,95 @@ export default function RatingSettingsPage() {
           Salvar
         </Button>
       </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Estratégias predefinidas
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {STRATEGY_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setDraft(p.settings)}
+                  className="text-left rounded-md border border-border p-3 hover:border-primary hover:bg-accent/30 transition-colors"
+                >
+                  <div className="font-semibold text-sm">{p.name}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{p.description}</div>
+                </button>
+              ))}
+            </div>
+
+            {customPresets.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <Label className="text-xs text-muted-foreground">Meus presets</Label>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {customPresets.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between rounded-md border border-border p-2 hover:border-primary transition-colors"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setDraft(p.settings)}
+                        className="text-left flex-1 text-sm font-medium"
+                      >
+                        {p.name}
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => deletePreset(p.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 w-full sm:w-auto">
+                  <Plus className="h-4 w-4" /> Salvar configuração atual como preset
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Salvar preset</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-2">
+                  <Label htmlFor="preset-name">Nome do preset</Label>
+                  <Input
+                    id="preset-name"
+                    placeholder="Ex.: Minha estratégia de FIIs"
+                    value={presetName}
+                    onChange={(e) => setPresetName(e.target.value)}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>Cancelar</Button>
+                  <Button
+                    onClick={async () => {
+                      await savePreset(presetName, draft);
+                      setPresetName("");
+                      setSaveDialogOpen(false);
+                    }}
+                  >
+                    Salvar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center justify-between">

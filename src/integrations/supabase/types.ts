@@ -203,6 +203,39 @@ export type Database = {
         }
         Relationships: []
       }
+      rating_presets: {
+        Row: {
+          created_at: string
+          enabled_criteria: string[]
+          id: string
+          name: string
+          thresholds: Json
+          updated_at: string
+          user_id: string
+          weights: Json
+        }
+        Insert: {
+          created_at?: string
+          enabled_criteria: string[]
+          id?: string
+          name: string
+          thresholds: Json
+          updated_at?: string
+          user_id: string
+          weights: Json
+        }
+        Update: {
+          created_at?: string
+          enabled_criteria?: string[]
+          id?: string
+          name?: string
+          thresholds?: Json
+          updated_at?: string
+          user_id?: string
+          weights?: Json
+        }
+        Relationships: []
+      }
       rating_settings: {
         Row: {
           created_at: string
