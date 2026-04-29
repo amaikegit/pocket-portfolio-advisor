@@ -297,8 +297,27 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
     const map: Record<string, string[]> = {};
     for (const col of columns) {
       if (col.filterable === false) continue;
+      // Apply all filters EXCEPT the current column, so options reflect
+      // what's still available given the other active filters.
+      const filteredForCol = assets.filter((a) => {
+        for (const [key, values] of Object.entries(filters)) {
+          if (key === col.key) continue;
+          if (!values || values.length === 0) continue;
+          const other = columns.find((c) => c.key === key);
+          if (!other) continue;
+          const v = other.accessor(a);
+          const str =
+            typeof v === "number"
+              ? other.key === "quantity" || other.key === "rating"
+                ? String(v)
+                : Number(v).toFixed(2)
+              : String(v);
+          if (!values.includes(str)) return false;
+        }
+        return true;
+      });
       const set = new Set<string>();
-      for (const a of assets) {
+      for (const a of filteredForCol) {
         const v = col.accessor(a);
         set.add(typeof v === "number" ? (col.key === "quantity" || col.key === "rating" ? String(v) : Number(v).toFixed(2)) : String(v));
       }
@@ -310,7 +329,7 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
       });
     }
     return map;
-  }, [assets]);
+  }, [assets, filters]);
 
   const processed = useMemo(() => {
     let result = [...assets];
