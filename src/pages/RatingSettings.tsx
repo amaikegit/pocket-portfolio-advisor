@@ -187,7 +187,8 @@ export default function RatingSettingsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base flex items-center justify-between">
               <span>Pesos dos critérios</span>
@@ -226,6 +227,50 @@ export default function RatingSettingsPage() {
             })}
           </CardContent>
         </Card>
+
+        <Card className="lg:col-span-1 lg:sticky lg:top-4 lg:self-start border-primary/30 bg-accent/10">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Preview ao vivo
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {previewAssets.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Adicione ativos à carteira para ver o preview.</p>
+            ) : (
+              <div className="space-y-2">
+                {previewAssets.map((a) => {
+                  const preview = computeRating(
+                    {
+                      pvp: a.pvp,
+                      monthlyProfitability: a.monthlyProfitability,
+                      priceVariation: a.priceVariation,
+                      averagePrice: a.averagePrice,
+                      difference: a.difference,
+                      totalInvested: a.totalInvested,
+                      portfolioProportion: a.portfolioProportion,
+                      dividendMonthsLast12: 0,
+                    },
+                    draft,
+                  );
+                  return (
+                    <div key={a.id} className="flex items-center justify-between rounded-md border border-border bg-background p-2.5">
+                      <div className="min-w-0">
+                        <div className="font-mono-display font-semibold text-primary text-sm">{a.ticker}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {a.ratingScore.toFixed(0)} → {preview.total.toFixed(0)}
+                        </div>
+                      </div>
+                      <StarRating rating={preview.stars} breakdown={preview} />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
         <Card>
           <CardHeader>
@@ -281,45 +326,6 @@ export default function RatingSettingsPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Preview ao vivo</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {previewAssets.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Adicione ativos à carteira para ver o preview.</p>
-            ) : (
-              <div className="space-y-2">
-                {previewAssets.map((a) => {
-                  const preview = computeRating(
-                    {
-                      pvp: a.pvp,
-                      monthlyProfitability: a.monthlyProfitability,
-                      priceVariation: a.priceVariation,
-                      averagePrice: a.averagePrice,
-                      difference: a.difference,
-                      totalInvested: a.totalInvested,
-                      portfolioProportion: a.portfolioProportion,
-                      dividendMonthsLast12: 0, // not needed for relative preview
-                    },
-                    draft,
-                  );
-                  return (
-                    <div key={a.id} className="flex items-center justify-between rounded-md border border-border p-3">
-                      <div>
-                        <div className="font-mono-display font-semibold text-primary">{a.ticker}</div>
-                        <div className="text-xs text-muted-foreground">
-                          score atual: {a.ratingScore.toFixed(0)} → novo: {preview.total.toFixed(0)}
-                        </div>
-                      </div>
-                      <StarRating rating={preview.stars} breakdown={preview} />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
     </AppLayout>
   );
 }
