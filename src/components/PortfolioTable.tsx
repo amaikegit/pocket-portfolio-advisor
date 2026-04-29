@@ -265,7 +265,7 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
-  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
   const handleSort = (key: string) => {
     if (sortKey === key) {
       setSortDir(sortDir === "asc" ? "desc" : sortDir === "desc" ? null : "asc");
@@ -276,23 +276,54 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
     }
   };
 
-  const handleFilter = (key: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+  const handleToggleValue = (key: string, value: string) => {
+    setFilters((prev) => {
+      const cur = prev[key] || [];
+      const next = cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value];
+      return { ...prev, [key]: next };
+    });
   };
 
-  const activeFilters = Object.keys(filters).filter((k) => filters[k]?.length > 0).length;
+  const handleClearFilter = (key: string) => {
+    setFilters((prev) => {
+      const { [key]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const activeFilters = Object.keys(filters).filter((k) => (filters[k]?.length ?? 0) > 0).length;
+
+  const optionsByColumn = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const col of columns) {
+      if (col.filterable === false) continue;
+      const set = new Set<string>();
+      for (const a of assets) {
+        const v = col.accessor(a);
+        set.add(typeof v === "number" ? (col.key === "quantity" || col.key === "rating" ? String(v) : Number(v).toFixed(2)) : String(v));
+      }
+      map[col.key] = Array.from(set).sort((a, b) => {
+        const na = Number(a);
+        const nb = Number(b);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        return a.localeCompare(b);
+      });
+    }
+    return map;
+  }, [assets]);
 
   const processed = useMemo(() => {
     let result = [...assets];
 
-    for (const [key, value] of Object.entries(filters)) {
-      if (!value) continue;
+    for (const [key, values] of Object.entries(filters)) {
+      if (!values || values.length === 0) continue;
       const col = columns.find((c) => c.key === key);
       if (!col) continue;
-      const lower = value.toLowerCase();
+      const set = new Set(values);
       result = result.filter((a) => {
         const v = col.accessor(a);
-        return String(v).toLowerCase().includes(lower);
+        const str = typeof v === "number" ? (col.key === "quantity" || col.key === "rating" ? String(v) : Number(v).toFixed(2)) : String(v);
+        return set.has(str);
       });
     }
 
@@ -343,8 +374,10 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
                   sortKey={sortKey}
                   sortDir={sortDir}
                   onSort={handleSort}
-                  filterValue={filters[col.key] || ""}
-                  onFilter={handleFilter}
+                  selectedValues={filters[col.key] || []}
+                  options={optionsByColumn[col.key] || []}
+                  onToggleValue={handleToggleValue}
+                  onClearFilter={handleClearFilter}
                 />
               ))}
             </TableRow>
