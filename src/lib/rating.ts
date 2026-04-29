@@ -64,6 +64,112 @@ export const DEFAULT_RATING_SETTINGS: RatingSettings = {
   ],
 };
 
+export interface RatingPreset {
+  id: string;
+  name: string;
+  description: string;
+  settings: RatingSettings;
+}
+
+/** Estratégias predefinidas para configuração rápida do rating. */
+export const STRATEGY_PRESETS: RatingPreset[] = [
+  {
+    id: "balanced",
+    name: "Moderada",
+    description: "Equilíbrio entre rentabilidade e segurança. Configuração padrão recomendada.",
+    settings: DEFAULT_RATING_SETTINGS,
+  },
+  {
+    id: "income",
+    name: "Rentabilidade (Renda)",
+    description: "Prioriza dividend yield e consistência de proventos para foco em renda passiva.",
+    settings: {
+      weights: {
+        valuation: 15,
+        dividendYield: 35,
+        priceVsAverage: 10,
+        unrealizedPnL: 10,
+        concentration: 5,
+        dividendConsistency: 25,
+      },
+      thresholds: {
+        valuation: { excellent: 0.9, good: 1.05, fair: 1.2 },
+        dividendYield: { excellent: 0.9, good: 0.6, fair: 0.35 },
+        priceVsAverage: { excellent: -5, good: 0, fair: 10 },
+        concentration: { idealMin: 5, idealMax: 15, highMax: 25, lowMin: 2 },
+        dividendConsistency: { excellent: 10, good: 7, fair: 3 },
+      },
+      enabledCriteria: [
+        "valuation",
+        "dividendYield",
+        "priceVsAverage",
+        "unrealizedPnL",
+        "concentration",
+        "dividendConsistency",
+      ],
+    },
+  },
+  {
+    id: "safety",
+    name: "Segurança",
+    description: "Valoriza valuation conservador, baixa concentração e histórico consistente de proventos.",
+    settings: {
+      weights: {
+        valuation: 30,
+        dividendYield: 15,
+        priceVsAverage: 10,
+        unrealizedPnL: 10,
+        concentration: 20,
+        dividendConsistency: 15,
+      },
+      thresholds: {
+        valuation: { excellent: 0.8, good: 0.95, fair: 1.05 },
+        dividendYield: { excellent: 0.8, good: 0.5, fair: 0.3 },
+        priceVsAverage: { excellent: -3, good: 2, fair: 8 },
+        concentration: { idealMin: 4, idealMax: 12, highMax: 18, lowMin: 1.5 },
+        dividendConsistency: { excellent: 11, good: 8, fair: 4 },
+      },
+      enabledCriteria: [
+        "valuation",
+        "dividendYield",
+        "priceVsAverage",
+        "unrealizedPnL",
+        "concentration",
+        "dividendConsistency",
+      ],
+    },
+  },
+  {
+    id: "aggressive",
+    name: "Agressiva",
+    description: "Foca em oportunidades de preço e resultado, tolera maior concentração e ignora consistência.",
+    settings: {
+      weights: {
+        valuation: 30,
+        dividendYield: 10,
+        priceVsAverage: 30,
+        unrealizedPnL: 25,
+        concentration: 5,
+        dividendConsistency: 0,
+      },
+      thresholds: {
+        valuation: { excellent: 0.9, good: 1.1, fair: 1.3 },
+        dividendYield: { excellent: 1.2, good: 0.8, fair: 0.5 },
+        priceVsAverage: { excellent: -8, good: -2, fair: 5 },
+        concentration: { idealMin: 8, idealMax: 25, highMax: 40, lowMin: 1 },
+        dividendConsistency: { excellent: 10, good: 6, fair: 1 },
+      },
+      enabledCriteria: [
+        "valuation",
+        "dividendYield",
+        "priceVsAverage",
+        "unrealizedPnL",
+        "concentration",
+      ],
+    },
+  },
+];
+
 const LABELS: Record<RatingCriterionKey, string> = {
   valuation: "Valuation (P/VP)",
   dividendYield: "Dividend Yield mensal",
