@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
@@ -64,18 +66,27 @@ function SortableHeader({
   sortKey,
   sortDir,
   onSort,
-  filterValue,
-  onFilter,
+  selectedValues,
+  options,
+  onToggleValue,
+  onClearFilter,
 }: {
   col: ColumnDef;
   sortKey: string | null;
   sortDir: SortDir;
   onSort: (key: string) => void;
-  filterValue: string;
-  onFilter: (key: string, value: string) => void;
+  selectedValues: string[];
+  options: string[];
+  onToggleValue: (key: string, value: string) => void;
+  onClearFilter: (key: string) => void;
 }) {
   const isActive = sortKey === col.key;
-  const hasFilter = filterValue.length > 0;
+  const hasFilter = selectedValues.length > 0;
+  const [search, setSearch] = useState("");
+  const filteredOptions = useMemo(
+    () => options.filter((o) => o.toLowerCase().includes(search.toLowerCase())),
+    [options, search],
+  );
 
   return (
     <TableHead className="font-mono-display text-[10px] px-1.5 py-1.5 whitespace-nowrap">
@@ -96,24 +107,49 @@ function SortableHeader({
                 <Filter className="h-2.5 w-2.5" />
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-44 p-2" align="start">
-              <Input
-                placeholder={`Filtrar ${col.label}...`}
-                value={filterValue}
-                onChange={(e) => onFilter(col.key, e.target.value)}
-                className="h-7 text-xs"
-                autoFocus
-              />
-              {hasFilter && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full mt-1 h-6 text-xs"
-                  onClick={() => onFilter(col.key, "")}
-                >
-                  Limpar
-                </Button>
-              )}
+            <PopoverContent className="w-56 p-2" align="start">
+              <div className="space-y-2">
+                <Input
+                  placeholder={`Buscar ${col.label}...`}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-7 text-xs"
+                  autoFocus
+                />
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span>{selectedValues.length} selecionado(s)</span>
+                  {hasFilter && (
+                    <button
+                      className="hover:text-primary"
+                      onClick={() => onClearFilter(col.key)}
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+                <ScrollArea className="h-48 pr-2">
+                  <div className="space-y-1">
+                    {filteredOptions.length === 0 && (
+                      <p className="text-[10px] text-muted-foreground py-2 text-center">Sem opções</p>
+                    )}
+                    {filteredOptions.map((opt) => {
+                      const checked = selectedValues.includes(opt);
+                      return (
+                        <label
+                          key={opt}
+                          className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/50 rounded px-1 py-1"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={() => onToggleValue(col.key, opt)}
+                          />
+                          <span className="truncate font-mono-display">{opt || "(vazio)"}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              </div>
             </PopoverContent>
           </Popover>
         )}
