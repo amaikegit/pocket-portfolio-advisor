@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
@@ -64,18 +66,27 @@ function SortableHeader({
   sortKey,
   sortDir,
   onSort,
-  filterValue,
-  onFilter,
+  selectedValues,
+  options,
+  onToggleValue,
+  onClearFilter,
 }: {
   col: ColumnDef;
   sortKey: string | null;
   sortDir: SortDir;
   onSort: (key: string) => void;
-  filterValue: string;
-  onFilter: (key: string, value: string) => void;
+  selectedValues: string[];
+  options: string[];
+  onToggleValue: (key: string, value: string) => void;
+  onClearFilter: (key: string) => void;
 }) {
   const isActive = sortKey === col.key;
-  const hasFilter = filterValue.length > 0;
+  const hasFilter = selectedValues.length > 0;
+  const [search, setSearch] = useState("");
+  const filteredOptions = useMemo(
+    () => options.filter((o) => o.toLowerCase().includes(search.toLowerCase())),
+    [options, search],
+  );
 
   return (
     <TableHead className="font-mono-display text-[10px] px-1.5 py-1.5 whitespace-nowrap">
@@ -96,24 +107,49 @@ function SortableHeader({
                 <Filter className="h-2.5 w-2.5" />
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-44 p-2" align="start">
-              <Input
-                placeholder={`Filtrar ${col.label}...`}
-                value={filterValue}
-                onChange={(e) => onFilter(col.key, e.target.value)}
-                className="h-7 text-xs"
-                autoFocus
-              />
-              {hasFilter && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full mt-1 h-6 text-xs"
-                  onClick={() => onFilter(col.key, "")}
-                >
-                  Limpar
-                </Button>
-              )}
+            <PopoverContent className="w-56 p-2" align="start">
+              <div className="space-y-2">
+                <Input
+                  placeholder={`Buscar ${col.label}...`}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-7 text-xs"
+                  autoFocus
+                />
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span>{selectedValues.length} selecionado(s)</span>
+                  {hasFilter && (
+                    <button
+                      className="hover:text-primary"
+                      onClick={() => onClearFilter(col.key)}
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+                <ScrollArea className="h-48 pr-2">
+                  <div className="space-y-1">
+                    {filteredOptions.length === 0 && (
+                      <p className="text-[10px] text-muted-foreground py-2 text-center">Sem opções</p>
+                    )}
+                    {filteredOptions.map((opt) => {
+                      const checked = selectedValues.includes(opt);
+                      return (
+                        <label
+                          key={opt}
+                          className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/50 rounded px-1 py-1"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={() => onToggleValue(col.key, opt)}
+                          />
+                          <span className="truncate font-mono-display">{opt || "(vazio)"}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              </div>
             </PopoverContent>
           </Popover>
         )}
@@ -229,7 +265,7 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
-  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [filters, setFilters] = useState<Record<string, string[]>>({});
   const handleSort = (key: string) => {
     if (sortKey === key) {
       setSortDir(sortDir === "asc" ? "desc" : sortDir === "desc" ? null : "asc");
@@ -240,23 +276,54 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
     }
   };
 
-  const handleFilter = (key: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+  const handleToggleValue = (key: string, value: string) => {
+    setFilters((prev) => {
+      const cur = prev[key] || [];
+      const next = cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value];
+      return { ...prev, [key]: next };
+    });
   };
 
-  const activeFilters = Object.keys(filters).filter((k) => filters[k]?.length > 0).length;
+  const handleClearFilter = (key: string) => {
+    setFilters((prev) => {
+      const { [key]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const activeFilters = Object.keys(filters).filter((k) => (filters[k]?.length ?? 0) > 0).length;
+
+  const optionsByColumn = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const col of columns) {
+      if (col.filterable === false) continue;
+      const set = new Set<string>();
+      for (const a of assets) {
+        const v = col.accessor(a);
+        set.add(typeof v === "number" ? (col.key === "quantity" || col.key === "rating" ? String(v) : Number(v).toFixed(2)) : String(v));
+      }
+      map[col.key] = Array.from(set).sort((a, b) => {
+        const na = Number(a);
+        const nb = Number(b);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        return a.localeCompare(b);
+      });
+    }
+    return map;
+  }, [assets]);
 
   const processed = useMemo(() => {
     let result = [...assets];
 
-    for (const [key, value] of Object.entries(filters)) {
-      if (!value) continue;
+    for (const [key, values] of Object.entries(filters)) {
+      if (!values || values.length === 0) continue;
       const col = columns.find((c) => c.key === key);
       if (!col) continue;
-      const lower = value.toLowerCase();
+      const set = new Set(values);
       result = result.filter((a) => {
         const v = col.accessor(a);
-        return String(v).toLowerCase().includes(lower);
+        const str = typeof v === "number" ? (col.key === "quantity" || col.key === "rating" ? String(v) : Number(v).toFixed(2)) : String(v);
+        return set.has(str);
       });
     }
 
@@ -307,8 +374,10 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
                   sortKey={sortKey}
                   sortDir={sortDir}
                   onSort={handleSort}
-                  filterValue={filters[col.key] || ""}
-                  onFilter={handleFilter}
+                  selectedValues={filters[col.key] || []}
+                  options={optionsByColumn[col.key] || []}
+                  onToggleValue={handleToggleValue}
+                  onClearFilter={handleClearFilter}
                 />
               ))}
             </TableRow>
