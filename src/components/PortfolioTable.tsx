@@ -1,9 +1,14 @@
 import { useState, useMemo } from "react";
-import { Check, X, ArrowUpDown, ArrowUp, ArrowDown, Filter, Pencil, Trash2, BarChart3 } from "lucide-react";
+import { Check, X, ArrowUpDown, ArrowUp, ArrowDown, Filter, Pencil, Trash2, BarChart3, Bookmark, Save, RefreshCw } from "lucide-react";
 import { Asset, AssetCalculated } from "@/types/portfolio";
 import { StarRating } from "@/components/StarRating";
 import { ClassifyFiiDialog } from "@/components/ClassifyFiiDialog";
 import { isFiiTicker } from "@/lib/fiiClassification";
+import { useTableFilterPresets } from "@/hooks/useTableFilterPresets";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -266,6 +271,11 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
   const [filters, setFilters] = useState<Record<string, string[]>>({});
+  const [activePresetId, setActivePresetId] = useState<string | null>(null);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [presetName, setPresetName] = useState("");
+  const { presets, savePreset, updatePreset, deletePreset } = useTableFilterPresets();
+
   const handleSort = (key: string) => {
     if (sortKey === key) {
       setSortDir(sortDir === "asc" ? "desc" : sortDir === "desc" ? null : "asc");
@@ -292,6 +302,31 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
   };
 
   const activeFilters = Object.keys(filters).filter((k) => (filters[k]?.length ?? 0) > 0).length;
+
+  const handleApplyPreset = (id: string) => {
+    const p = presets.find((x) => x.id === id);
+    if (!p) return;
+    setFilters(p.filters || {});
+    setActivePresetId(id);
+  };
+
+  const handleSaveNew = async () => {
+    const name = presetName.trim();
+    if (!name) return;
+    await savePreset(name, filters);
+    setPresetName("");
+    setSaveOpen(false);
+  };
+
+  const handleUpdateActive = async () => {
+    if (!activePresetId) return;
+    await updatePreset(activePresetId, filters);
+  };
+
+  const handleDeletePreset = async (id: string) => {
+    await deletePreset(id);
+    if (activePresetId === id) setActivePresetId(null);
+  };
 
   const optionsByColumn = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -373,11 +408,89 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
   return (
     <div className="space-y-2">
       <TableSummaryHeader assets={assets} />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Bookmark className="h-3.5 w-3.5" />
+          <span>Filtros salvos:</span>
+        </div>
+        {presets.length === 0 && (
+          <span className="text-xs text-muted-foreground italic">nenhum ainda</span>
+        )}
+        {presets.map((p) => (
+          <div
+            key={p.id}
+            className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${
+              activePresetId === p.id ? "border-primary bg-primary/10" : "border-border"
+            }`}
+          >
+            <button
+              className="font-mono-display hover:text-primary"
+              onClick={() => handleApplyPreset(p.id)}
+            >
+              {p.name}
+            </button>
+            <button
+              className="text-muted-foreground hover:text-destructive"
+              onClick={() => handleDeletePreset(p.id)}
+              title="Excluir filtro salvo"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
+        <div className="flex-1" />
+        {activePresetId && activeFilters > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={handleUpdateActive}
+          >
+            <RefreshCw className="h-3 w-3" />
+            Atualizar atual
+          </Button>
+        )}
+        <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              disabled={activeFilters === 0}
+            >
+              <Save className="h-3 w-3" />
+              Salvar filtro
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Salvar filtro atual</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="preset-name">Nome do filtro</Label>
+              <Input
+                id="preset-name"
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                placeholder="Ex: FIIs de Logística"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                {activeFilters} coluna(s) com filtros aplicados
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setSaveOpen(false)}>Cancelar</Button>
+              <Button onClick={handleSaveNew} disabled={!presetName.trim()}>Salvar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
       {activeFilters > 0 && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Filter className="h-3.5 w-3.5" />
           <span>{activeFilters} filtro(s) ativo(s) — {processed.length} de {assets.length} ativos</span>
-          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setFilters({})}>
+          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => { setFilters({}); setActivePresetId(null); }}>
             Limpar todos
           </Button>
         </div>
