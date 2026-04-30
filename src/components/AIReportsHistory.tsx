@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { FileText, Loader2, Sparkles, Trash2, Eye, Calendar, Download } from "lucide-react";
 import { toast } from "sonner";
 import { fetchPageByCreatedAtDesc } from "@/lib/supabasePagination";
+import { formatBRDateTime } from "@/lib/brt";
 
 const PAGE_SIZE = 25;
 
@@ -184,7 +185,7 @@ export function AIReportsHistory() {
                     </div>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Calendar className="h-3 w-3" />
-                      {new Date(r.created_at).toLocaleString("pt-BR")}
+                      {formatBRDateTime(r.created_at)}
                     </div>
                   </div>
                   <div className="flex gap-1 shrink-0">
@@ -245,7 +246,7 @@ export function AIReportsHistory() {
                 <div className="mb-4 pb-3 border-b border-border">
                   <h1 className="text-xl font-mono-display font-semibold mb-1">{selected.title}</h1>
                   <p className="text-xs text-muted-foreground">
-                    Gerado em {new Date(selected.created_at).toLocaleString("pt-BR")}
+                    Gerado em {formatBRDateTime(selected.created_at)}
                   </p>
                 </div>
                 <article

@@ -14,6 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, Legend } from "recharts";
 import { BarChart3, Plus, DollarSign, TrendingUp, Calendar, Loader2, Trash2, Pencil, Filter, ArrowUpDown, ChevronDown, ChevronRight } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
+import { todayISOInBRT } from "@/lib/brt";
 
 import { AccumulatedDividendsChart } from "@/components/dividends/AccumulatedDividendsChart";
 import { AssetDividendEvolution } from "@/components/dividends/AssetDividendEvolution";
@@ -46,13 +47,17 @@ const Dividends = () => {
   const currentYear = new Date().getFullYear();
   const existingTickers = assets.map((a) => a.ticker).sort();
 
-  const resetForm = () => setForm({
-    ticker: "",
-    amount: "",
-    month: (new Date().getMonth() + 1).toString(),
-    year: new Date().getFullYear().toString(),
-    date: new Date().toISOString().slice(0, 10),
-  });
+  const resetForm = () => {
+    const today = todayISOInBRT();
+    const [y, m] = today.split("-");
+    setForm({
+      ticker: "",
+      amount: "",
+      month: String(parseInt(m, 10)),
+      year: y,
+      date: today,
+    });
+  };
 
   // Last dividend amount per ticker for hint
   const lastDividendByTicker = (ticker: string): number | null => {
@@ -66,7 +71,7 @@ const Dividends = () => {
     await addDividend({
       ticker: form.ticker,
       amount: parseFloat(form.amount.replace(",", ".")),
-      payment_date: form.date || new Date().toISOString().slice(0, 10),
+      payment_date: form.date || todayISOInBRT(),
       month: parseInt(form.month),
       year: parseInt(form.year),
     });

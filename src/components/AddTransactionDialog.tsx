@@ -10,6 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import type { Transaction, TransactionType, AssetType } from "@/types/portfolio";
+import { todayISOInBRT } from "@/lib/brt";
 
 const assetTypes: { value: AssetType; label: string }[] = [
   { value: "acoes", label: "Ações" },
@@ -34,7 +35,7 @@ export function AddTransactionDialog({ onAdd, existingTickers, trigger }: Props)
   const [assetType, setAssetType] = useState<AssetType>("acoes");
   const [ticker, setTicker] = useState("");
   const [customTicker, setCustomTicker] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => todayISOInBRT());
   const [quantity, setQuantity] = useState(0);
   const [price, setPrice] = useState(0);
   const [otherCosts, setOtherCosts] = useState(0);
@@ -48,7 +49,7 @@ export function AddTransactionDialog({ onAdd, existingTickers, trigger }: Props)
     setAssetType("acoes");
     setTicker("");
     setCustomTicker("");
-    setDate(new Date().toISOString().slice(0, 10));
+    setDate(todayISOInBRT());
     setQuantity(0);
     setPrice(0);
     setOtherCosts(0);
