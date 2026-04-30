@@ -217,8 +217,8 @@ export function AIReportsHistory() {
       </CardContent>
 
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <div className="flex items-start justify-between gap-3">
               <DialogTitle className="flex items-center gap-2 font-mono-display text-left">
                 <Sparkles className="h-4 w-4 text-primary" />
@@ -236,7 +236,7 @@ export function AIReportsHistory() {
               </Button>
             </div>
           </DialogHeader>
-          <ScrollArea className="flex-1 mt-2">
+          <ScrollArea className="flex-1 min-h-0 mt-2">
             {selected && (
               <div
                 id="ai-report-printable"
