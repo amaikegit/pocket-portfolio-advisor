@@ -56,22 +56,38 @@ serve(async (req) => {
     ]);
     console.log(`snapshot-portfolios: loaded ${assets.length} assets, ${txs.length} transactions`);
 
-    // Recalc qty/cost from transactions per (user, ticker)
+    // Group transactions by (user, ticker), sorted by date for correct avg-cost math.
     type Key = string;
-    const txMap = new Map<Key, { qty: number; cost: number }>();
+    const txByKey = new Map<Key, Array<{ type: string; quantity: number; price: number; other_costs: number; date?: string }>>();
     for (const t of txs ?? []) {
       const k = `${t.user_id}::${t.ticker}`;
-      const cur = txMap.get(k) ?? { qty: 0, cost: 0 };
-      const q = Number(t.quantity), p = Number(t.price), o = Number(t.other_costs ?? 0);
-      if (t.type === "buy") {
-        cur.cost += q * p + o;
-        cur.qty += q;
-      } else if (cur.qty > 0) {
-        const avg = cur.cost / cur.qty;
-        cur.qty = Math.max(0, cur.qty - q);
-        cur.cost = cur.qty * avg;
+      if (!txByKey.has(k)) txByKey.set(k, []);
+      txByKey.get(k)!.push(t as any);
+    }
+
+    // Mirrors the frontend `recalcFromTx` in src/hooks/usePortfolio.ts:
+    // transactions are applied ON TOP of the asset row's stored quantity/cost,
+    // not as a replacement. This ensures the snapshot matches the dashboard.
+    function applyTx(
+      baseQty: number,
+      baseCost: number,
+      list: Array<{ type: string; quantity: number; price: number; other_costs: number; date?: string }>,
+    ): { qty: number; cost: number } {
+      let qty = baseQty;
+      let cost = baseCost;
+      const sorted = [...list].sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+      for (const tx of sorted) {
+        const q = Number(tx.quantity), p = Number(tx.price), o = Number(tx.other_costs ?? 0);
+        if (tx.type === "buy") {
+          cost += q * p + o;
+          qty += q;
+        } else if (qty > 0) {
+          const avg = cost / qty;
+          qty = Math.max(0, qty - q);
+          cost = qty * avg;
+        }
       }
-      txMap.set(k, cur);
+      return { qty, cost };
     }
 
     // Aggregate per user
@@ -81,27 +97,24 @@ serve(async (req) => {
     for (const a of assets ?? []) {
       const k = `${a.user_id}::${a.ticker}`;
       seen.add(k);
-      const tx = txMap.get(k);
-      // Trust the asset row's quantity/cost when transactions are incomplete
-      // (e.g. user imported positions via CSV without a full historical tx log).
-      // Only use transaction-derived numbers when they meet or exceed the asset
-      // row, which signals that the tx history is the authoritative source.
-      const assetQty = Number(a.quantity);
-      const assetInvested = Number(a.total_invested);
-      const useTx = tx && tx.qty >= assetQty && tx.qty > 0;
-      const qty = useTx ? tx!.qty : assetQty;
-      const invested = useTx ? tx!.cost : assetInvested;
+      const list = txByKey.get(k);
+      const baseQty = Number(a.quantity);
+      const baseInvested = Number(a.total_invested);
+      const { qty, cost } = list && list.length > 0
+        ? applyTx(baseQty, baseInvested, list)
+        : { qty: baseQty, cost: baseInvested };
       const cur = perUser.get(a.user_id) ?? { current: 0, invested: 0 };
       cur.current += qty * Number(a.current_price);
-      cur.invested += invested;
+      cur.invested += cost;
       perUser.set(a.user_id, cur);
     }
-    // Tickers only in transactions (no asset row) — skip current price (unknown)
-    for (const [k, v] of txMap.entries()) {
+    // Tickers only in transactions (no asset row) — skip current price (unknown).
+    for (const [k, list] of txByKey.entries()) {
       if (seen.has(k)) continue;
       const [user_id] = k.split("::");
+      const { cost } = applyTx(0, 0, list);
       const cur = perUser.get(user_id) ?? { current: 0, invested: 0 };
-      cur.invested += v.cost;
+      cur.invested += cost;
       perUser.set(user_id, cur);
     }
 
