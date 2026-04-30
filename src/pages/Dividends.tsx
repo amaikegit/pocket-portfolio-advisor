@@ -44,7 +44,7 @@ const Dividends = () => {
   const [recordsOpen, setRecordsOpen] = useState(false);
   const [paidTableOpen, setPaidTableOpen] = useState(false);
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = parseInt(todayISOInBRT().slice(0, 4), 10);
   const existingTickers = assets.map((a) => a.ticker).sort();
 
   const resetForm = () => {
