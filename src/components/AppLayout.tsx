@@ -3,6 +3,7 @@ import { Clock } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Progress } from "@/components/ui/progress";
 import { AppSidebar, AppSidebarActions } from "@/components/AppSidebar";
+import { formatBRDate, formatBRTime } from "@/lib/brt";
 
 interface AppLayoutProps extends AppSidebarActions {
   title: ReactNode;
@@ -48,7 +49,7 @@ export function AppLayout({
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Clock className="h-3.5 w-3.5" />
                 <span>
-                  Última atualização: {lastUpdated.toLocaleDateString("pt-BR")} às {lastUpdated.toLocaleTimeString("pt-BR")}
+                  Última atualização: {formatBRDate(lastUpdated)} às {formatBRTime(lastUpdated)}
                 </span>
               </div>
             )}

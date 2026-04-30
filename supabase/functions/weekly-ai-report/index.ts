@@ -221,9 +221,12 @@ Regras de formatação:
         if (!content) { errors.push(`user ${u.id}: empty AI content`); continue; }
 
         const now = new Date();
+        const BRT = "America/Sao_Paulo";
+        const dateBR = now.toLocaleDateString("pt-BR", { timeZone: BRT });
+        const timeBR = now.toLocaleTimeString("pt-BR", { timeZone: BRT });
         const title = reportType === "weekly"
-          ? `Relatório Semanal — ${now.toLocaleDateString("pt-BR")}`
-          : `Relatório Manual — ${now.toLocaleDateString("pt-BR")} ${now.toLocaleTimeString("pt-BR")}`;
+          ? `Relatório Semanal — ${dateBR}`
+          : `Relatório Manual — ${dateBR} ${timeBR}`;
 
         const { error: insErr } = await admin.from("ai_reports").insert({
           user_id: u.id,

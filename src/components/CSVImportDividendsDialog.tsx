@@ -9,6 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { DividendInput } from "@/hooks/useDividends";
+import { todayISOInBRT } from "@/lib/brt";
 
 interface CSVImportDividendsDialogProps {
   onImport: (dividends: DividendInput[]) => Promise<number>;
@@ -49,7 +50,7 @@ export function CSVImportDividendsDialog({ onImport }: CSVImportDividendsDialogP
             amount: parsedAmount,
             month: parsedMonth,
             year: parsedYear,
-            payment_date: date || new Date().toISOString().slice(0, 10),
+            payment_date: date || todayISOInBRT(),
           });
         }
 

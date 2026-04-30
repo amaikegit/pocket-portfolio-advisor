@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Bell, AlertTriangle, CheckCircle2, Info, X, RefreshCw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatBRDateTime } from "@/lib/brt";
 
 interface Alert {
   id: string;
@@ -105,7 +106,7 @@ export function AlertsPanel() {
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">{a.message}</p>
                     <p className="text-xs text-muted-foreground/70 mt-1">
-                      {new Date(a.created_at).toLocaleString("pt-BR")}
+                      {formatBRDateTime(a.created_at)}
                     </p>
                   </div>
                   {!a.read && (
