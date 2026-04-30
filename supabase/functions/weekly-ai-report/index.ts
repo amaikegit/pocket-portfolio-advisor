@@ -66,6 +66,38 @@ serve(async (req) => {
         );
         if (assets.length === 0) continue;
 
+        // Apply transactions on top of asset rows so quantity/cost match the
+        // dashboard (mirrors src/hooks/usePortfolio.ts `applyTransactions`).
+        const txs = await fetchAllPaginated<any>(
+          admin, "transactions",
+          "ticker, type, quantity, price, other_costs, date",
+          (q) => q.eq("user_id", u.id),
+        );
+        const txByTicker = new Map<string, any[]>();
+        for (const t of txs ?? []) {
+          if (!txByTicker.has(t.ticker)) txByTicker.set(t.ticker, []);
+          txByTicker.get(t.ticker)!.push(t);
+        }
+        for (const a of assets) {
+          const list = txByTicker.get(a.ticker);
+          if (!list || list.length === 0) continue;
+          let qty = Number(a.quantity || 0);
+          let cost = Number(a.total_invested || 0);
+          const sorted = [...list].sort((x, y) => String(x.date ?? "").localeCompare(String(y.date ?? "")));
+          for (const tx of sorted) {
+            const q = Number(tx.quantity), p = Number(tx.price), o = Number(tx.other_costs ?? 0);
+            if (tx.type === "buy") { cost += q * p + o; qty += q; }
+            else if (qty > 0) {
+              const avg = cost / qty;
+              qty = Math.max(0, qty - q);
+              cost = qty * avg;
+            }
+          }
+          a.quantity = qty;
+          a.total_invested = cost;
+          a.average_price = qty > 0 ? cost / qty : 0;
+        }
+
         // Last week dividends
         const since = new Date();
         since.setDate(since.getDate() - 7);
