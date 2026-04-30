@@ -118,7 +118,8 @@ serve(async (req) => {
       perUser.set(user_id, cur);
     }
 
-    const today = new Date().toISOString().slice(0, 10);
+    // Snapshot date no fuso de Brasília (America/Sao_Paulo)
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
     const rows = Array.from(perUser.entries()).map(([user_id, v]) => ({
       user_id,
       snapshot_date: today,
