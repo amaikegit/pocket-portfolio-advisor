@@ -51,8 +51,8 @@ serve(async (req) => {
       }>(supabase, "assets", "user_id, ticker, quantity, current_price, total_invested"),
       fetchAllPaginated<{
         user_id: string; ticker: string; type: string;
-        quantity: number; price: number; other_costs: number;
-      }>(supabase, "transactions", "user_id, ticker, type, quantity, price, other_costs"),
+        quantity: number; price: number; other_costs: number; date: string;
+      }>(supabase, "transactions", "user_id, ticker, type, quantity, price, other_costs, date"),
     ]);
     console.log(`snapshot-portfolios: loaded ${assets.length} assets, ${txs.length} transactions`);
 
