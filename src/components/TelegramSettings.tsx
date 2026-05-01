@@ -72,9 +72,12 @@ export function TelegramSettings() {
 
   const togglePref = async (field: "alerts_enabled" | "reports_enabled", value: boolean) => {
     if (!link) return;
+    const update = field === "alerts_enabled"
+      ? { alerts_enabled: value }
+      : { reports_enabled: value };
     const { error } = await supabase
       .from("telegram_links")
-      .update({ [field]: value })
+      .update(update)
       .eq("id", link.id);
     if (error) {
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
