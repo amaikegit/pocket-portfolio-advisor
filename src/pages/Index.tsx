@@ -9,6 +9,7 @@ import { PortfolioBenchmark } from "@/components/PortfolioBenchmark";
 import { PortfolioSnapshots } from "@/components/PortfolioSnapshots";
 import { AlertsPanel } from "@/components/AlertsPanel";
 import { AIReportsHistory } from "@/components/AIReportsHistory";
+import { TelegramSettings } from "@/components/TelegramSettings";
 import { AppLayout } from "@/components/AppLayout";
 
 const Index = () => {
@@ -39,6 +40,7 @@ const Index = () => {
     >
       <SummaryCards totals={totals} />
       <AlertsPanel />
+      <TelegramSettings />
       <PortfolioSnapshots />
       <AIReportsHistory />
       <PortfolioEvolution assets={assets} />
