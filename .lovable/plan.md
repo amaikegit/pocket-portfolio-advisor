@@ -1,75 +1,78 @@
+## Integração com Telegram — Alertas e Relatórios da Carteira
 
+Adicionar um bot do Telegram para você receber **alertas inteligentes** e **relatórios** da sua carteira diretamente no app, além de poder pedir informações sob demanda enviando comandos.
 
-# Refinamento do sistema de Rating dos ativos
+---
 
-Hoje o rating é binário (3 critérios → 0–3 pontos → mapeado para 2/3/4/5 estrelas), nunca chega a 1, salta direto de 4 para 5 e usa limiares fixos no código. O plano abaixo torna a escala real (1–5), adiciona critérios mais ricos, permite pesos e deixa os limiares **configuráveis pelo usuário**.
+### O que você vai poder fazer no Telegram
 
-## 1. Nova lógica de pontuação (escala real 1–5)
+**Receber automaticamente:**
+- Alertas inteligentes (mesmos do painel: dividendo silencioso, meta mensal, etc.) assim que forem gerados
+- Relatório semanal da IA (quando o cron rodar) entregue no seu chat
 
-Substituir o cálculo em `src/lib/portfolio.ts → calculateAsset` por um motor baseado em **score ponderado 0–100** convertido em estrelas.
+**Pedir sob demanda (comandos):**
+- `/start` — vincula seu chat do Telegram à sua conta do app (via código)
+- `/patrimonio` — saldo total atual, variação, rentabilidade
+- `/dividendos` — dividendos recebidos no mês + progresso da meta
+- `/alertas` — últimos alertas não lidos
+- `/relatorio` — gera e devolve um novo relatório de IA na hora
+- `/top` e `/piores` — 5 melhores/piores ativos por variação
+- `/ajuda` — lista de comandos
 
-Critérios propostos (cada um devolve uma sub-nota 0–1, depois multiplicada pelo peso):
+---
 
-| Critério | Como medir | Peso padrão |
-|---|---|---|
-| **Valuation (P/VP)** | `pvp < 0.85` → 1.0 ; `0.85–1.0` → 0.7 ; `1.0–1.1` → 0.4 ; `>1.1` → 0.1 ; `pvp = 0` (sem dado) → neutro 0.5 | 25% |
-| **Dividend Yield mensal** | `monthlyProfitability` em faixas: `>1.0%` → 1.0 ; `0.7–1.0` → 0.7 ; `0.4–0.7` → 0.4 ; `<0.4` → 0.1 | 25% |
-| **Posição vs preço médio** | `priceVariation < -5%` → 1.0 (oportunidade) ; `-5–0%` → 0.7 ; `0–10%` → 0.5 ; `>10%` → 0.3 | 15% |
-| **Lucro/prejuízo não realizado** | `difference / totalInvested`: positivo escala 0.5→1.0 ; negativo 0.5→0.0 | 15% |
-| **Concentração na carteira** | `portfolioProportion`: 5–15% → 1.0 ; 15–25% → 0.6 ; >25% → 0.2 ; <2% → 0.5 | 10% |
-| **Consistência de proventos** (novo) | nº de meses com dividendo nos últimos 12 (vem de `dividends`): 10–12 → 1.0 ; 6–9 → 0.6 ; 1–5 → 0.3 ; 0 → 0.0 | 10% |
+### Como funciona (passo a passo para você)
 
-Conversão final: `stars = clamp(round(score / 20), 1, 5)` — agora a escala usa **1 a 5 estrelas reais** e tem granularidade.
+1. Eu configuro a conexão com o **conector Telegram da Lovable** (você só clica e autoriza — não precisa criar bot manualmente nem mexer com tokens).
+2. No app, em **Configurações**, aparece um botão "Conectar Telegram" que mostra um código de 6 dígitos.
+3. Você abre o bot no Telegram, manda `/start 123456`, e pronto — sua conta fica vinculada.
+4. A partir daí, alertas e relatórios chegam automaticamente, e você pode usar os comandos a qualquer momento.
 
-Cada ativo passa a expor também um `ratingBreakdown` com a contribuição de cada critério, para tooltip.
+---
 
-## 2. Limiares e pesos configuráveis pelo usuário
+### Detalhes técnicos
 
-- Nova tabela **`rating_settings`** (1 linha por usuário) com colunas:
-  `weights jsonb`, `thresholds jsonb`, `enabled_criteria text[]`, timestamps + RLS por `user_id`.
-- Migração cria a linha default no primeiro acesso (ou lazy via upsert).
-- Hook `useRatingSettings()` carrega/salva as configurações; `calculateAsset` recebe `settings` como segundo parâmetro (com fallback para defaults se ausente).
+**Banco de dados (nova migration):**
+- `telegram_links` — vincula `user_id` ↔ `chat_id` (com RLS por usuário)
+- `telegram_link_codes` — códigos temporários de 6 dígitos com expiração de 10 min
+- `telegram_bot_state` — singleton com `update_offset` para o long polling
+- `telegram_outbox` — fila de mensagens pendentes (alertas/relatórios) para entrega assíncrona
 
-## 3. Tooltip explicativo no `StarRating`
+**Conector:** uso do `standard_connectors--connect` com `connector_id: telegram` (gateway OAuth da Lovable, sem precisar de token manual seu).
 
-`src/components/StarRating.tsx` ganha `breakdown?: RatingBreakdown` opcional. Ao passar o mouse, mostra:
+**Edge Functions novas:**
+- `telegram-poll` — roda a cada 1 min via pg_cron, faz long polling do `getUpdates` por ~55s, processa comandos recebidos e responde
+- `telegram-send` — envia mensagens (usado pelos alertas/relatórios e pelos handlers de comando)
+- `telegram-link-code` — gera código de vinculação para o usuário logado
 
-```text
-★★★★☆  (4.2 / 5 — score 84/100)
-• Valuation (P/VP 0.92)         +18 / 25
-• Dividend Yield (0.85%/mês)   +17 / 25
-• Posição vs PM (-3%)          +10 / 15
-• Resultado (+8%)              +12 / 15
-• Concentração (12%)           +10 / 10
-• Consistência (11/12 meses)    +9 / 10
-```
+**Edge Functions atualizadas:**
+- `compute-alerts` — após inserir alertas novos, enfileira no `telegram_outbox` para os usuários vinculados
+- `weekly-ai-report` — após gerar relatório, envia resumo + link no Telegram
 
-Usa o `Tooltip` do shadcn/ui já presente no projeto. Em mobile, vira `Popover` no toque.
+**Frontend:**
+- Nova seção em **Configurações** (ou card na home) com:
+  - Status da vinculação (vinculado / não vinculado)
+  - Botão "Gerar código de vinculação" → mostra código + instrução `/start <código>` no @SeuBot
+  - Botão "Desvincular"
+  - Toggle "Receber alertas no Telegram" e "Receber relatórios semanais no Telegram"
 
-## 4. Página de configuração
+**Agendamento (pg_cron):**
+- `poll-telegram-updates` rodando a cada minuto invocando `telegram-poll`
 
-Nova rota `/configuracoes/rating` (e atalho no menu) com:
+**Segurança:**
+- RLS em todas as tabelas novas (só o próprio usuário vê seus links/códigos)
+- Códigos de vinculação expiram em 10 min e são invalidados após uso
+- Comandos só respondem se o `chat_id` estiver vinculado a um `user_id` (exceto `/start` e `/ajuda`)
+- Validação de input com Zod em todas as edge functions
 
-- Sliders para os pesos (somam 100%, normalização automática).
-- Inputs numéricos para os limiares de cada faixa.
-- Switches para ligar/desligar critérios.
-- Botão "Restaurar padrão".
-- Preview ao vivo: tabela com 3 ativos da carteira mostrando como o rating muda conforme os pesos.
+---
 
-## 5. Integração com dividendos (critério de consistência)
+### Ordem de implementação
 
-`usePortfolio` passa a receber também a contagem de meses com dividendo por ticker (já temos `useDividends` paginado). Calculado uma vez por carregamento e injetado em `calculateAsset`.
-
-## Detalhes técnicos
-
-- **Arquivos a editar:** `src/lib/portfolio.ts`, `src/types/portfolio.ts` (adicionar `ratingScore`, `ratingBreakdown`), `src/components/StarRating.tsx`, `src/components/PortfolioTable.tsx` (passar breakdown).
-- **Arquivos a criar:** `src/hooks/useRatingSettings.ts`, `src/lib/rating.ts` (motor isolado e testável), `src/pages/RatingSettings.tsx`, migração SQL para `rating_settings`.
-- **Compatibilidade:** se `rating_settings` não existir para o usuário, usa defaults — nada quebra para usuários atuais.
-- **Backend AI:** `analyze-portfolio` e `weekly-ai-report` continuam recebendo `rating` (agora 1–5 real) sem mudança de contrato; opcionalmente passamos `ratingScore` para enriquecer a análise.
-- **Testes:** adicionar `src/test/rating.test.ts` cobrindo edge cases (sem P/VP, DY zero, concentração extrema, sem dividendos).
-
-## Não incluído (para evitar escopo grande)
-
-- Dados de mercado externos (liquidez, setor, volatilidade) — exigiria nova fonte; pode entrar numa fase 2.
-- Histórico de rating ao longo do tempo — também fase 2 se quiser gráfico de evolução do score.
-
+1. Conectar o conector Telegram
+2. Criar migration com as 4 tabelas + RLS
+3. Criar edge functions `telegram-send`, `telegram-poll`, `telegram-link-code`
+4. Agendar cron job `poll-telegram-updates`
+5. Atualizar `compute-alerts` e `weekly-ai-report` para empurrar mensagens
+6. Criar UI de vinculação em Configurações
+7. Testar fluxo end-to-end (vincular → comando → alerta automático)
