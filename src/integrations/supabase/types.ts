@@ -347,6 +347,126 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_bot_state: {
+        Row: {
+          id: number
+          update_offset: number
+          updated_at: string
+        }
+        Insert: {
+          id: number
+          update_offset?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          update_offset?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      telegram_link_codes: {
+        Row: {
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      telegram_links: {
+        Row: {
+          alerts_enabled: boolean
+          chat_id: number
+          created_at: string
+          first_name: string | null
+          id: string
+          reports_enabled: boolean
+          updated_at: string
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          alerts_enabled?: boolean
+          chat_id: number
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          reports_enabled?: boolean
+          updated_at?: string
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          alerts_enabled?: boolean
+          chat_id?: number
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          reports_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      telegram_outbox: {
+        Row: {
+          attempts: number
+          chat_id: number
+          created_at: string
+          id: string
+          last_error: string | null
+          parse_mode: string | null
+          sent_at: string | null
+          status: string
+          text: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          chat_id: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          parse_mode?: string | null
+          sent_at?: string | null
+          status?: string
+          text: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          chat_id?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          parse_mode?: string | null
+          sent_at?: string | null
+          status?: string
+          text?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           asset_type: string
