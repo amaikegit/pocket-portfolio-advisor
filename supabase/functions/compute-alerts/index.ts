@@ -160,6 +160,30 @@ serve(async (req) => {
           .select();
         if (error) console.error("upsert alerts:", error);
         else inserted += data?.length ?? 0;
+
+        // Enqueue Telegram messages for inserted alerts (if user linked)
+        try {
+          const insertedAlerts = data ?? [];
+          if (insertedAlerts.length > 0) {
+            const { data: link } = await supabase
+              .from("telegram_links")
+              .select("chat_id, alerts_enabled")
+              .eq("user_id", userId)
+              .maybeSingle();
+            if (link && link.alerts_enabled) {
+              const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+              const rows = insertedAlerts.map((a: any) => {
+                const icon = a.severity === "warning" ? "⚠️" : a.severity === "success" ? "✅" : "ℹ️";
+                const tk = a.ticker ? ` [${a.ticker}]` : "";
+                const text = `${icon} <b>${escape(a.title)}</b>${tk}\n${escape(a.message)}`;
+                return { user_id: userId, chat_id: link.chat_id, text, parse_mode: "HTML" };
+              });
+              await supabase.from("telegram_outbox").insert(rows);
+            }
+          }
+        } catch (e) {
+          console.error("telegram enqueue error:", e);
+        }
       }
     }
 
