@@ -365,6 +365,33 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_chats: {
+        Row: {
+          chat_id: number
+          created_at: string
+          id: string
+          label: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chat_id: number
+          created_at?: string
+          id?: string
+          label?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chat_id?: number
+          created_at?: string
+          id?: string
+          label?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       telegram_link_codes: {
         Row: {
           code: string
@@ -464,6 +491,57 @@ export type Database = {
           status?: string
           text?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      telegram_schedules: {
+        Row: {
+          chat_id: number
+          created_at: string
+          daily_times: string[]
+          enabled: boolean
+          id: string
+          interval_hours: number | null
+          kind: string
+          last_sent_at: string | null
+          mode: string
+          name: string
+          next_run_at: string | null
+          updated_at: string
+          user_id: string
+          weekdays: number[]
+        }
+        Insert: {
+          chat_id: number
+          created_at?: string
+          daily_times?: string[]
+          enabled?: boolean
+          id?: string
+          interval_hours?: number | null
+          kind: string
+          last_sent_at?: string | null
+          mode?: string
+          name: string
+          next_run_at?: string | null
+          updated_at?: string
+          user_id: string
+          weekdays?: number[]
+        }
+        Update: {
+          chat_id?: number
+          created_at?: string
+          daily_times?: string[]
+          enabled?: boolean
+          id?: string
+          interval_hours?: number | null
+          kind?: string
+          last_sent_at?: string | null
+          mode?: string
+          name?: string
+          next_run_at?: string | null
+          updated_at?: string
+          user_id?: string
+          weekdays?: number[]
         }
         Relationships: []
       }

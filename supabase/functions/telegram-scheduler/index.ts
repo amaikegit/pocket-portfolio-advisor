@@ -1,0 +1,330 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const BRT_TZ = "America/Sao_Paulo";
+const PAGE_SIZE = 1000;
+
+function fmtBRL(n: number) {
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+function escapeHtml(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+async function fetchAllPaginated<T = any>(
+  client: any, table: string, columns: string, apply?: (q: any) => any,
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  while (true) {
+    let q = client.from(table).select(columns).order("created_at", { ascending: true });
+    if (apply) q = apply(q);
+    const { data, error } = await q.range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
+function applyTx(baseQty: number, baseCost: number, list: any[]) {
+  let qty = Number(baseQty) || 0;
+  let cost = Number(baseCost) || 0;
+  const sorted = [...list].sort((a, b) => (a.date < b.date ? -1 : 1));
+  for (const tx of sorted) {
+    const txQty = Number(tx.quantity) || 0;
+    const txPrice = Number(tx.price) || 0;
+    const txCosts = Number(tx.other_costs) || 0;
+    if (tx.type === "buy") {
+      cost += txQty * txPrice + txCosts;
+      qty += txQty;
+    } else {
+      const avg = qty > 0 ? cost / qty : 0;
+      cost = Math.max(0, cost - avg * txQty);
+      qty = Math.max(0, qty - txQty);
+    }
+  }
+  return { qty, cost };
+}
+
+async function getPortfolio(admin: any, userId: string) {
+  const [assets, txs] = await Promise.all([
+    fetchAllPaginated<any>(admin, "assets", "ticker, quantity, current_price, average_price, total_invested",
+      (q) => q.eq("user_id", userId)),
+    fetchAllPaginated<any>(admin, "transactions", "ticker, type, quantity, price, other_costs, date",
+      (q) => q.eq("user_id", userId)),
+  ]);
+  const txByTicker = new Map<string, any[]>();
+  for (const t of txs) {
+    if (!txByTicker.has(t.ticker)) txByTicker.set(t.ticker, []);
+    txByTicker.get(t.ticker)!.push(t);
+  }
+  let totalCurrent = 0, totalInvested = 0;
+  const list: { ticker: string; totalCurrent: number; variation: number }[] = [];
+  for (const a of assets) {
+    const tlist = txByTicker.get(a.ticker) ?? [];
+    const { qty, cost } = applyTx(a.quantity, a.total_invested, tlist);
+    if (qty <= 0) continue;
+    const cur = qty * Number(a.current_price);
+    totalCurrent += cur;
+    totalInvested += cost;
+    const variation = cost > 0 ? ((cur - cost) / cost) * 100 : 0;
+    list.push({ ticker: a.ticker, totalCurrent: cur, variation });
+  }
+  return { totalCurrent, totalInvested, diff: totalCurrent - totalInvested, list };
+}
+
+function brtNowParts(d = new Date()) {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: BRT_TZ, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", weekday: "short", hour12: false,
+  });
+  const parts = fmt.formatToParts(d);
+  const get = (t: string) => parts.find(p => p.type === t)?.value ?? "";
+  const wdMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return {
+    year: Number(get("year")),
+    month: Number(get("month")),
+    day: Number(get("day")),
+    hour: Number(get("hour")),
+    minute: Number(get("minute")),
+    weekday: wdMap[get("weekday").slice(0, 3) as string] ?? 0,
+  };
+}
+
+/** Offset (em minutos) do fuso BRT em relação a UTC nesta data. Ex.: -180. */
+function brtOffsetMinutes(d: Date) {
+  // Compara hora local representada no BRT vs UTC.
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: BRT_TZ, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  });
+  const parts = fmt.formatToParts(d);
+  const get = (t: string) => Number(parts.find(p => p.type === t)?.value ?? "0");
+  const asUTC = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  return Math.round((asUTC - d.getTime()) / 60000);
+}
+
+/** Converte hora BRT (yyyy-mm-dd HH:mm) para Date UTC. */
+function brtToUTC(year: number, month: number, day: number, hour: number, minute: number): Date {
+  // Aproxima usando o offset atual de BRT (sem horário de verão atualmente). Estimativa boa o suficiente.
+  const probe = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const off = brtOffsetMinutes(probe); // em minutos
+  return new Date(probe.getTime() - off * 60000);
+}
+
+/** Calcula próxima execução com base no agendamento. */
+function computeNextRun(sched: any, fromDate: Date): Date | null {
+  const weekdays: number[] = (sched.weekdays?.length ? sched.weekdays : [0, 1, 2, 3, 4, 5, 6]);
+
+  if (sched.mode === "interval") {
+    const hours = Math.max(1, Number(sched.interval_hours) || 1);
+    const base = sched.last_sent_at ? new Date(sched.last_sent_at) : fromDate;
+    let next = new Date(base.getTime() + hours * 3600 * 1000);
+    if (next < fromDate) next = new Date(fromDate.getTime() + 60 * 1000);
+    // Ajusta para próximo dia da semana válido em BRT
+    for (let i = 0; i < 8; i++) {
+      const p = brtNowParts(next);
+      if (weekdays.includes(p.weekday)) return next;
+      next = new Date(next.getTime() + 24 * 3600 * 1000);
+    }
+    return next;
+  }
+
+  // mode === "daily"
+  const times: string[] = (sched.daily_times ?? []).filter((t: string) => /^\d{2}:\d{2}$/.test(t));
+  if (times.length === 0) return null;
+
+  for (let dayOffset = 0; dayOffset < 8; dayOffset++) {
+    const probe = new Date(fromDate.getTime() + dayOffset * 24 * 3600 * 1000);
+    const p = brtNowParts(probe);
+    if (!weekdays.includes(p.weekday)) continue;
+    for (const t of times.sort()) {
+      const [hh, mm] = t.split(":").map(Number);
+      const candidate = brtToUTC(p.year, p.month, p.day, hh, mm);
+      if (candidate > fromDate) return candidate;
+    }
+  }
+  return null;
+}
+
+async function buildMessage(admin: any, sched: any): Promise<string> {
+  const t = await getPortfolio(admin, sched.user_id);
+
+  if (sched.kind === "patrimony") {
+    const pct = t.totalInvested > 0 ? ((t.diff / t.totalInvested) * 100) : 0;
+    const sign = t.diff >= 0 ? "📈" : "📉";
+    // Variação do dia: comparar com snapshot mais recente anterior a hoje (BRT)
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: BRT_TZ });
+    const { data: prevSnap } = await admin
+      .from("portfolio_snapshots")
+      .select("total_current, snapshot_date")
+      .eq("user_id", sched.user_id)
+      .lt("snapshot_date", today)
+      .order("snapshot_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    let dayLine = "";
+    if (prevSnap) {
+      const prev = Number(prevSnap.total_current);
+      const dayDiff = t.totalCurrent - prev;
+      const dayPct = prev > 0 ? (dayDiff / prev) * 100 : 0;
+      const dSign = dayDiff >= 0 ? "🟢" : "🔴";
+      dayLine = `\n${dSign} Variação do dia: ${dayDiff >= 0 ? "+" : ""}${fmtBRL(dayDiff)} (${dayPct >= 0 ? "+" : ""}${dayPct.toFixed(2)}%)`;
+    }
+    return `<b>💰 Patrimônio</b>\n\n` +
+      `Atual: <b>${fmtBRL(t.totalCurrent)}</b>\n` +
+      `Investido: ${fmtBRL(t.totalInvested)}\n` +
+      `${sign} Resultado total: ${fmtBRL(t.diff)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)` +
+      dayLine;
+  }
+
+  if (sched.kind === "dividends_month") {
+    const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: BRT_TZ, year: "numeric", month: "2-digit" });
+    const parts = fmt.formatToParts(new Date());
+    const year = Number(parts.find(p => p.type === "year")!.value);
+    const month = Number(parts.find(p => p.type === "month")!.value);
+    const [{ data: divs }, { data: settings }] = await Promise.all([
+      admin.from("dividends").select("amount, ticker").eq("user_id", sched.user_id).eq("year", year).eq("month", month),
+      admin.from("user_settings").select("monthly_dividend_goal").eq("user_id", sched.user_id).maybeSingle(),
+    ]);
+    const total = (divs ?? []).reduce((s: number, d: any) => s + Number(d.amount), 0);
+    const goal = Number(settings?.monthly_dividend_goal ?? 0);
+    const pct = goal > 0 ? ((total / goal) * 100) : null;
+    const count = (divs ?? []).length;
+    return `<b>💵 Dividendos ${String(month).padStart(2, "0")}/${year}</b>\n\n` +
+      `Recebido: <b>${fmtBRL(total)}</b> em ${count} pagamento(s)\n` +
+      (goal > 0 ? `Meta: ${fmtBRL(goal)}\nProgresso: ${pct!.toFixed(1)}%` : `Defina uma meta mensal no app.`);
+  }
+
+  if (sched.kind === "top_movers") {
+    if (t.list.length === 0) return `📊 Sem ativos para calcular movimentações.`;
+    const sorted = [...t.list].sort((a, b) => b.variation - a.variation);
+    const tops = sorted.slice(0, 3);
+    const bots = sorted.slice(-3).reverse();
+    const fmtRow = (a: any, i: number) =>
+      `${i + 1}. <b>${a.ticker}</b> ${a.variation >= 0 ? "+" : ""}${a.variation.toFixed(2)}%`;
+    return `<b>📊 Movimentações</b>\n\n` +
+      `🚀 Maiores altas\n${tops.map(fmtRow).join("\n")}\n\n` +
+      `📉 Maiores baixas\n${bots.map(fmtRow).join("\n")}`;
+  }
+
+  return `Tipo de alerta desconhecido: ${sched.kind}`;
+}
+
+async function processSchedule(admin: any, sched: any, now: Date) {
+  try {
+    const text = await buildMessage(admin, sched);
+    // Enfileira no outbox
+    await admin.from("telegram_outbox").insert({
+      user_id: sched.user_id,
+      chat_id: sched.chat_id,
+      text,
+      parse_mode: "HTML",
+      status: "pending",
+    });
+    const next = computeNextRun({ ...sched, last_sent_at: now.toISOString() }, now);
+    await admin.from("telegram_schedules").update({
+      last_sent_at: now.toISOString(),
+      next_run_at: next ? next.toISOString() : null,
+    }).eq("id", sched.id);
+    return { ok: true, id: sched.id };
+  } catch (e) {
+    console.error("processSchedule error", sched.id, e);
+    return { ok: false, id: sched.id, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  try {
+    let body: any = {};
+    try { body = await req.json(); } catch {}
+
+    const now = new Date();
+
+    // Modo "test now": força envio de um schedule específico
+    if (body?.schedule_id && body?.test === true) {
+      const { data: s, error } = await admin
+        .from("telegram_schedules").select("*").eq("id", body.schedule_id).single();
+      if (error || !s) return new Response(JSON.stringify({ error: "schedule not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const text = await buildMessage(admin, s);
+      await admin.from("telegram_outbox").insert({
+        user_id: s.user_id, chat_id: s.chat_id, text, parse_mode: "HTML", status: "pending",
+      });
+      // dispara envio imediato
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      fetch(`${supabaseUrl}/functions/v1/telegram-send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+        body: "{}",
+      }).catch(() => {});
+      return new Response(JSON.stringify({ ok: true, queued: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Inicializa next_run_at de schedules sem ele
+    const { data: missing } = await admin
+      .from("telegram_schedules")
+      .select("*")
+      .eq("enabled", true)
+      .is("next_run_at", null);
+    for (const s of missing ?? []) {
+      const next = computeNextRun(s, now);
+      if (next) {
+        await admin.from("telegram_schedules").update({ next_run_at: next.toISOString() }).eq("id", s.id);
+      }
+    }
+
+    // Busca schedules devidos
+    const { data: due, error } = await admin
+      .from("telegram_schedules")
+      .select("*")
+      .eq("enabled", true)
+      .lte("next_run_at", now.toISOString())
+      .limit(100);
+    if (error) throw error;
+
+    const results: any[] = [];
+    for (const s of due ?? []) {
+      results.push(await processSchedule(admin, s, now));
+    }
+
+    // Drena outbox
+    if (results.length > 0) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        await fetch(`${supabaseUrl}/functions/v1/telegram-send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: "{}",
+        });
+      } catch (_) {}
+    }
+
+    return new Response(JSON.stringify({ ok: true, processed: results.length, results }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    console.error("telegram-scheduler error", e);
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
