@@ -251,7 +251,7 @@ async function handleCommand(admin: any, chatId: number, fromUser: any, text: st
       `/patrimonio — saldo total e variação\n` +
       `/dividendos — recebidos no mês + meta\n` +
       `/alertas — últimos alertas não lidos\n` +
-      `/top — 5 ativos com melhor variação\n` +
+      `/top — 5 melhores ativos (rating ⭐ + valor)\n` +
       `/piores — 5 ativos com pior variação\n` +
       `/relatorio — gera relatório de IA agora\n` +
       `/desvincular — remove vínculo deste chat\n` +
