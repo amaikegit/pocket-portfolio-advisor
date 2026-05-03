@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CalendarClock, Plus, Trash2, Send, Pencil, Bell } from "lucide-react";
 import { formatBRDateTime } from "@/lib/brt";
 
-type Kind = "patrimony" | "dividends_month" | "top_movers";
+type Kind = "patrimony" | "dividends_month" | "top_movers" | "price_cross";
 type Mode = "interval" | "daily";
 
 interface ChatRow {
@@ -38,17 +38,21 @@ interface Schedule {
   enabled: boolean;
   last_sent_at: string | null;
   next_run_at: string | null;
+  config: any;
+  state: any;
 }
 
 const KIND_LABEL: Record<Kind, string> = {
   patrimony: "Patrimônio + variação do dia",
   dividends_month: "Dividendos do mês",
   top_movers: "Top movimentações do dia",
+  price_cross: "Cruzamento de preço",
 };
 const KIND_ICON: Record<Kind, string> = {
   patrimony: "💰",
   dividends_month: "💵",
   top_movers: "📊",
+  price_cross: "🎯",
 };
 
 const WEEKDAYS = [
@@ -66,6 +70,7 @@ const SUGGESTIONS: Array<{ name: string; kind: Kind; mode: Mode; interval_hours?
   { name: "Patrimônio a cada 4h", kind: "patrimony", mode: "interval", interval_hours: 4, weekdays: [1,2,3,4,5], description: "Atualização do patrimônio a cada 4 horas em dias úteis." },
   { name: "Resumo semanal de dividendos", kind: "dividends_month", mode: "daily", daily_times: ["20:00"], weekdays: [5], description: "Toda sexta às 20h, total de dividendos do mês + meta." },
   { name: "Top movimentações no fechamento", kind: "top_movers", mode: "daily", daily_times: ["18:30"], weekdays: [1,2,3,4,5], description: "3 ativos que mais subiram e mais caíram, após o fechamento do pregão." },
+  { name: "Alerta de preço (cruzamento)", kind: "price_cross", mode: "interval", interval_hours: 1, weekdays: [0,1,2,3,4,5,6], description: "Avisa quando o preço atual de um ticker cruza um valor (acima/abaixo)." },
 ];
 
 export function TelegramSchedules() {
@@ -93,6 +98,9 @@ export function TelegramSchedules() {
     daily_times: ["09:00"] as string[],
     weekdays: [1,2,3,4,5] as number[],
     enabled: true,
+    ticker: "",
+    threshold_price: "" as string,
+    direction: "above" as "above" | "below",
   });
 
   const load = async () => {
@@ -154,6 +162,9 @@ export function TelegramSchedules() {
       daily_times: preset?.daily_times ?? ["09:00"],
       weekdays: preset?.weekdays ?? [1,2,3,4,5],
       enabled: true,
+      ticker: "",
+      threshold_price: "",
+      direction: "above",
     });
     setOpen(true);
   };
@@ -169,6 +180,9 @@ export function TelegramSchedules() {
       daily_times: s.daily_times?.length ? s.daily_times : ["09:00"],
       weekdays: s.weekdays?.length ? s.weekdays : [1,2,3,4,5],
       enabled: s.enabled,
+      ticker: String(s.config?.ticker ?? ""),
+      threshold_price: s.config?.threshold_price != null ? String(s.config.threshold_price) : "",
+      direction: (s.config?.direction === "below" ? "below" : "above"),
     });
     setOpen(true);
   };
@@ -181,17 +195,36 @@ export function TelegramSchedules() {
     if (!form.chat_id) {
       toast({ title: "Escolha um chat", variant: "destructive" }); return;
     }
+    if (form.kind === "price_cross") {
+      const tk = form.ticker.trim().toUpperCase();
+      const thr = Number(String(form.threshold_price).replace(",", "."));
+      if (!tk) { toast({ title: "Informe o ticker", variant: "destructive" }); return; }
+      if (!Number.isFinite(thr) || thr <= 0) { toast({ title: "Informe um preço-alvo válido", variant: "destructive" }); return; }
+    }
     const payload = {
       user_id: user.id,
       chat_id: Number(form.chat_id),
       name: form.name.trim(),
       kind: form.kind,
-      mode: form.mode,
-      interval_hours: form.mode === "interval" ? Math.max(1, Number(form.interval_hours) || 1) : null,
-      daily_times: form.mode === "daily" ? form.daily_times.filter(t => /^\d{2}:\d{2}$/.test(t)) : [],
-      weekdays: form.weekdays.length ? form.weekdays : [0,1,2,3,4,5,6],
+      mode: form.kind === "price_cross" ? "interval" : form.mode,
+      interval_hours: form.kind === "price_cross"
+        ? 1
+        : (form.mode === "interval" ? Math.max(1, Number(form.interval_hours) || 1) : null),
+      daily_times: form.kind !== "price_cross" && form.mode === "daily"
+        ? form.daily_times.filter(t => /^\d{2}:\d{2}$/.test(t)) : [],
+      weekdays: form.kind === "price_cross"
+        ? [0,1,2,3,4,5,6]
+        : (form.weekdays.length ? form.weekdays : [0,1,2,3,4,5,6]),
       enabled: form.enabled,
       next_run_at: null,
+      config: form.kind === "price_cross"
+        ? {
+            ticker: form.ticker.trim().toUpperCase(),
+            threshold_price: Number(String(form.threshold_price).replace(",", ".")),
+            direction: form.direction,
+          }
+        : {},
+      state: {},
     };
     const { error } = editing
       ? await supabase.from("telegram_schedules").update(payload).eq("id", editing.id)
@@ -330,13 +363,23 @@ export function TelegramSchedules() {
                     <Badge variant="secondary" className="text-xs">{KIND_LABEL[s.kind]}</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
-                    {s.mode === "interval"
-                      ? `A cada ${s.interval_hours}h`
-                      : `Horários: ${(s.daily_times ?? []).join(", ") || "—"}`}
-                    {" · "}
-                    {s.weekdays?.length === 7 ? "todos os dias" : s.weekdays.map(w => WEEKDAYS.find(x => x.v === w)?.label).join("/")}
-                    {" · "}
-                    para <span className="font-medium">{chatLabel(s.chat_id)}</span>
+                    {s.kind === "price_cross" ? (
+                      <>
+                        {s.config?.ticker} {s.config?.direction === "below" ? "abaixo de" : "acima de"} <b>R$ {Number(s.config?.threshold_price ?? 0).toFixed(2)}</b>
+                        {" · "}verifica a cada minuto
+                        {" · "}para <span className="font-medium">{chatLabel(s.chat_id)}</span>
+                      </>
+                    ) : (
+                      <>
+                        {s.mode === "interval"
+                          ? `A cada ${s.interval_hours}h`
+                          : `Horários: ${(s.daily_times ?? []).join(", ") || "—"}`}
+                        {" · "}
+                        {s.weekdays?.length === 7 ? "todos os dias" : s.weekdays.map(w => WEEKDAYS.find(x => x.v === w)?.label).join("/")}
+                        {" · "}
+                        para <span className="font-medium">{chatLabel(s.chat_id)}</span>
+                      </>
+                    )}
                   </div>
                   {s.next_run_at && s.enabled && (
                     <div className="text-xs text-muted-foreground mt-0.5">
@@ -381,6 +424,7 @@ export function TelegramSchedules() {
                     <SelectItem value="patrimony">💰 Patrimônio + variação do dia</SelectItem>
                     <SelectItem value="dividends_month">💵 Dividendos do mês</SelectItem>
                     <SelectItem value="top_movers">📊 Top movimentações</SelectItem>
+                    <SelectItem value="price_cross">🎯 Cruzamento de preço (ticker)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -397,6 +441,44 @@ export function TelegramSchedules() {
                 </Select>
               </div>
 
+              {form.kind === "price_cross" ? (
+                <div className="space-y-3 rounded-md border p-3">
+                  <div className="text-xs text-muted-foreground">
+                    Verifica o preço atual do ticker a cada minuto e dispara <b>uma única vez</b> quando o preço cruza o alvo.
+                    Se voltar e cruzar de novo, dispara novamente.
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Ticker</Label>
+                      <Input
+                        placeholder="Ex.: PETR4"
+                        value={form.ticker}
+                        onChange={e => setForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Direção</Label>
+                      <Select value={form.direction} onValueChange={(v: "above"|"below") => setForm(f => ({ ...f, direction: v }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="above">⬆️ Acima de</SelectItem>
+                          <SelectItem value="below">⬇️ Abaixo de</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Preço-alvo (R$)</Label>
+                    <Input
+                      type="number" step="0.01" min="0"
+                      placeholder="Ex.: 32.50"
+                      value={form.threshold_price}
+                      onChange={e => setForm(f => ({ ...f, threshold_price: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              ) : (
+              <>
               <div className="space-y-1.5">
                 <Label>Recorrência</Label>
                 <Select value={form.mode} onValueChange={(v: Mode) => setForm(f => ({ ...f, mode: v }))}>
@@ -456,6 +538,8 @@ export function TelegramSchedules() {
                   ))}
                 </div>
               </div>
+              </>
+              )}
 
               <div className="flex items-center justify-between rounded-md border p-3">
                 <Label htmlFor="enabled-sched" className="cursor-pointer">Ativo</Label>

@@ -75,7 +75,7 @@ function applyTx(baseQty: number, baseCost: number, list: any[]) {
 
 async function getPortfolioTotals(admin: any, userId: string) {
   const [assets, txs] = await Promise.all([
-    fetchAllPaginated<any>(admin, "assets", "ticker, quantity, current_price, average_price, total_invested",
+    fetchAllPaginated<any>(admin, "assets", "ticker, quantity, current_price, average_price, total_invested, dividend_yield, pvp",
       (q) => q.eq("user_id", userId)),
     fetchAllPaginated<any>(admin, "transactions", "ticker, type, quantity, price, other_costs, date",
       (q) => q.eq("user_id", userId)),
@@ -86,18 +86,100 @@ async function getPortfolioTotals(admin: any, userId: string) {
     txByTicker.get(t.ticker)!.push(t);
   }
   let totalCurrent = 0, totalInvested = 0;
-  const list: { ticker: string; totalCurrent: number; variation: number }[] = [];
+  const list: {
+    ticker: string; totalCurrent: number; variation: number;
+    currentPrice: number; averagePrice: number; difference: number;
+    totalInvested: number; dividendYield: number; pvp: number;
+  }[] = [];
   for (const a of assets) {
     const tlist = txByTicker.get(a.ticker) ?? [];
     const { qty, cost } = applyTx(a.quantity, a.total_invested, tlist);
     if (qty <= 0) continue;
-    const cur = qty * Number(a.current_price);
+    const currentPrice = Number(a.current_price);
+    const cur = qty * currentPrice;
     totalCurrent += cur;
     totalInvested += cost;
     const variation = cost > 0 ? ((cur - cost) / cost) * 100 : 0;
-    list.push({ ticker: a.ticker, totalCurrent: cur, variation });
+    const averagePrice = qty > 0 ? cost / qty : 0;
+    list.push({
+      ticker: a.ticker, totalCurrent: cur, variation,
+      currentPrice, averagePrice,
+      difference: cur - cost,
+      totalInvested: cost,
+      dividendYield: Number(a.dividend_yield) || 0,
+      pvp: Number(a.pvp) || 0,
+    });
   }
   return { totalCurrent, totalInvested, diff: totalCurrent - totalInvested, list };
+}
+
+// ====== Rating (mirror src/lib/rating.ts defaults) ======
+function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
+function ratingStarsFor(item: any, portfolioProportion: number, dividendMonthsLast12: number): number {
+  const t = {
+    valuation: { excellent: 0.85, good: 1.0, fair: 1.1 },
+    dividendYield: { excellent: 1.0, good: 0.7, fair: 0.4 },
+    priceVsAverage: { excellent: -5, good: 0, fair: 10 },
+    concentration: { idealMin: 5, idealMax: 15, highMax: 25, lowMin: 2 },
+    dividendConsistency: { excellent: 10, good: 6, fair: 1 },
+  };
+  const w = { valuation: 25, dividendYield: 25, priceVsAverage: 15, unrealizedPnL: 15, concentration: 10, dividendConsistency: 10 };
+
+  const monthlyProfitability = item.currentPrice > 0 ? (item.dividendYield / item.currentPrice) * 100 : 0;
+  const priceVar = item.currentPrice - item.averagePrice;
+
+  // valuation
+  let sValuation = 0.5;
+  if (item.pvp > 0) {
+    if (item.pvp < t.valuation.excellent) sValuation = 1.0;
+    else if (item.pvp < t.valuation.good) sValuation = 0.7;
+    else if (item.pvp < t.valuation.fair) sValuation = 0.4;
+    else sValuation = 0.1;
+  }
+  // dy
+  let sDY = 0.1;
+  if (monthlyProfitability > t.dividendYield.excellent) sDY = 1.0;
+  else if (monthlyProfitability > t.dividendYield.good) sDY = 0.7;
+  else if (monthlyProfitability > t.dividendYield.fair) sDY = 0.4;
+  // price vs average
+  let sPVA = 0.5;
+  if (item.averagePrice > 0) {
+    const pct = (priceVar / item.averagePrice) * 100;
+    if (pct < t.priceVsAverage.excellent) sPVA = 1.0;
+    else if (pct < t.priceVsAverage.good) sPVA = 0.7;
+    else if (pct < t.priceVsAverage.fair) sPVA = 0.5;
+    else sPVA = 0.3;
+  }
+  // pnl
+  let sPNL = 0.5;
+  if (item.totalInvested > 0) {
+    const pct = (item.difference / item.totalInvested) * 100;
+    sPNL = clamp(0.5 + pct / 100, 0, 1);
+  }
+  // concentration
+  const prop = portfolioProportion;
+  let sConc: number;
+  if (prop >= t.concentration.idealMin && prop <= t.concentration.idealMax) sConc = 1.0;
+  else if (prop > t.concentration.idealMax && prop <= t.concentration.highMax) sConc = 0.6;
+  else if (prop > t.concentration.highMax) sConc = 0.2;
+  else if (prop < t.concentration.lowMin) sConc = 0.5;
+  else sConc = 0.7;
+  // dividend consistency
+  const m = dividendMonthsLast12;
+  let sCons: number;
+  if (m >= t.dividendConsistency.excellent) sCons = 1.0;
+  else if (m >= t.dividendConsistency.good) sCons = 0.6;
+  else if (m >= t.dividendConsistency.fair) sCons = 0.3;
+  else sCons = 0;
+
+  const total =
+    sValuation * w.valuation +
+    sDY * w.dividendYield +
+    sPVA * w.priceVsAverage +
+    sPNL * w.unrealizedPnL +
+    sConc * w.concentration +
+    sCons * w.dividendConsistency;
+  return clamp(Math.round(total / 20), 1, 5);
 }
 
 function nowBRTMonthYear() {
@@ -169,7 +251,7 @@ async function handleCommand(admin: any, chatId: number, fromUser: any, text: st
       `/patrimonio — saldo total e variação\n` +
       `/dividendos — recebidos no mês + meta\n` +
       `/alertas — últimos alertas não lidos\n` +
-      `/top — 5 ativos com melhor variação\n` +
+      `/top — 5 melhores ativos (rating ⭐ + valor)\n` +
       `/piores — 5 ativos com pior variação\n` +
       `/relatorio — gera relatório de IA agora\n` +
       `/desvincular — remove vínculo deste chat\n` +
@@ -238,13 +320,53 @@ async function handleCommand(admin: any, chatId: number, fromUser: any, text: st
 
   if (cmd === "/top" || cmd === "/piores") {
     const t = await getPortfolioTotals(admin, link.user_id);
-    const sorted = [...t.list].sort((a, b) => b.variation - a.variation);
-    const picks = cmd === "/top" ? sorted.slice(0, 5) : sorted.slice(-5).reverse();
-    const title = cmd === "/top" ? "🚀 Top 5 ativos" : "📉 Piores 5 ativos";
-    const lines = picks.map((a, i) =>
-      `${i + 1}. <b>${a.ticker}</b> — ${a.variation >= 0 ? "+" : ""}${a.variation.toFixed(2)}% (${fmtBRL(a.totalCurrent)})`
-    );
-    await sendMessage(chatId, `<b>${title}</b>\n\n${lines.join("\n")}`);
+    if (t.list.length === 0) {
+      await sendMessage(chatId, `📊 Sem ativos para classificar.`);
+      return;
+    }
+
+    if (cmd === "/top") {
+      // Buscar meses com proventos nos últimos 12 meses por ticker
+      const since = new Date();
+      since.setMonth(since.getMonth() - 12);
+      const sinceYear = since.getFullYear();
+      const sinceMonth = since.getMonth() + 1;
+      const { data: divs } = await admin
+        .from("dividends")
+        .select("ticker, year, month")
+        .eq("user_id", link.user_id)
+        .or(`year.gt.${sinceYear},and(year.eq.${sinceYear},month.gte.${sinceMonth})`);
+      const monthsByTicker = new Map<string, Set<string>>();
+      for (const d of divs ?? []) {
+        const key = `${d.year}-${String(d.month).padStart(2, "0")}`;
+        if (!monthsByTicker.has(d.ticker)) monthsByTicker.set(d.ticker, new Set());
+        monthsByTicker.get(d.ticker)!.add(key);
+      }
+
+      const enriched = t.list.map(a => {
+        const prop = t.totalCurrent > 0 ? (a.totalCurrent / t.totalCurrent) * 100 : 0;
+        const months = Math.min(12, monthsByTicker.get(a.ticker)?.size ?? 0);
+        const stars = ratingStarsFor(a, prop, months);
+        return { ...a, stars, prop };
+      });
+      enriched.sort((x, y) => (y.stars - x.stars) || (y.totalCurrent - x.totalCurrent));
+      const picks = enriched.slice(0, 5);
+      const lines = picks.map((a, i) => {
+        const stars = "⭐".repeat(a.stars) + "·".repeat(5 - a.stars);
+        return `${i + 1}. <b>${a.ticker}</b> ${stars}\n` +
+          `   ${fmtBRL(a.totalCurrent)} · ${a.variation >= 0 ? "+" : ""}${a.variation.toFixed(2)}%`;
+      });
+      await sendMessage(chatId,
+        `<b>🏆 Top 5 da carteira</b>\n` +
+        `<i>Ranking por nota de 5 estrelas + valor atual</i>\n\n${lines.join("\n")}`);
+    } else {
+      const sorted = [...t.list].sort((a, b) => a.variation - b.variation);
+      const picks = sorted.slice(0, 5);
+      const lines = picks.map((a, i) =>
+        `${i + 1}. <b>${a.ticker}</b> — ${a.variation >= 0 ? "+" : ""}${a.variation.toFixed(2)}% (${fmtBRL(a.totalCurrent)})`
+      );
+      await sendMessage(chatId, `<b>📉 Piores 5 ativos</b>\n\n${lines.join("\n")}`);
+    }
     return;
   }
 

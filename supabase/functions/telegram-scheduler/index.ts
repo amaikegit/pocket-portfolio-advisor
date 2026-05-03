@@ -122,6 +122,11 @@ function brtToUTC(year: number, month: number, day: number, hour: number, minute
 
 /** Calcula próxima execução com base no agendamento. */
 function computeNextRun(sched: any, fromDate: Date): Date | null {
+  // price_cross is event-driven: check frequently (every minute)
+  if (sched.kind === "price_cross") {
+    return new Date(fromDate.getTime() + 60 * 1000);
+  }
+
   const weekdays: number[] = (sched.weekdays?.length ? sched.weekdays : [0, 1, 2, 3, 4, 5, 6]);
 
   if (sched.mode === "interval") {
@@ -155,7 +160,7 @@ function computeNextRun(sched: any, fromDate: Date): Date | null {
   return null;
 }
 
-async function buildMessage(admin: any, sched: any): Promise<string> {
+async function buildMessage(admin: any, sched: any): Promise<string | null> {
   const t = await getPortfolio(admin, sched.user_id);
 
   if (sched.kind === "patrimony") {
@@ -216,26 +221,70 @@ async function buildMessage(admin: any, sched: any): Promise<string> {
       `📉 Maiores baixas\n${bots.map(fmtRow).join("\n")}`;
   }
 
+  if (sched.kind === "price_cross") {
+    const cfg = sched.config ?? {};
+    const ticker = String(cfg.ticker ?? "").toUpperCase().trim();
+    const threshold = Number(cfg.threshold_price);
+    const direction = (cfg.direction === "below" ? "below" : "above") as "above" | "below";
+    if (!ticker || !Number.isFinite(threshold) || threshold <= 0) {
+      return null;
+    }
+    const { data: asset } = await admin
+      .from("assets")
+      .select("ticker, current_price")
+      .eq("user_id", sched.user_id)
+      .eq("ticker", ticker)
+      .maybeSingle();
+    if (!asset) return null;
+    const price = Number(asset.current_price);
+    if (!Number.isFinite(price) || price <= 0) return null;
+
+    const currentSide: "above" | "below" = price >= threshold ? "above" : "below";
+    const prevSide: "above" | "below" | null = (sched.state?.last_side === "above" || sched.state?.last_side === "below")
+      ? sched.state.last_side : null;
+
+    // Sempre atualiza o state, mesmo sem disparo
+    await admin.from("telegram_schedules").update({
+      state: { last_price: price, last_side: currentSide, last_check_at: new Date().toISOString() },
+    }).eq("id", sched.id);
+
+    // Dispara somente quando cruza na direção configurada
+    const triggered =
+      prevSide !== null &&
+      prevSide !== currentSide &&
+      currentSide === direction;
+
+    if (!triggered) return null;
+
+    const arrow = direction === "above" ? "🟢⬆️" : "🔴⬇️";
+    const word = direction === "above" ? "subiu acima de" : "caiu abaixo de";
+    return `<b>${arrow} ${escapeHtml(ticker)}</b>\n\n` +
+      `Preço atual: <b>${fmtBRL(price)}</b>\n` +
+      `${word} <b>${fmtBRL(threshold)}</b>`;
+  }
+
   return `Tipo de alerta desconhecido: ${sched.kind}`;
 }
 
 async function processSchedule(admin: any, sched: any, now: Date) {
   try {
     const text = await buildMessage(admin, sched);
-    // Enfileira no outbox
-    await admin.from("telegram_outbox").insert({
-      user_id: sched.user_id,
-      chat_id: sched.chat_id,
-      text,
-      parse_mode: "HTML",
-      status: "pending",
-    });
-    const next = computeNextRun({ ...sched, last_sent_at: now.toISOString() }, now);
-    await admin.from("telegram_schedules").update({
-      last_sent_at: now.toISOString(),
-      next_run_at: next ? next.toISOString() : null,
-    }).eq("id", sched.id);
-    return { ok: true, id: sched.id };
+    // Sempre reagenda
+    const next = computeNextRun({ ...sched, last_sent_at: text ? now.toISOString() : sched.last_sent_at }, now);
+    const update: any = { next_run_at: next ? next.toISOString() : null };
+    if (text) update.last_sent_at = now.toISOString();
+    await admin.from("telegram_schedules").update(update).eq("id", sched.id);
+
+    if (text) {
+      await admin.from("telegram_outbox").insert({
+        user_id: sched.user_id,
+        chat_id: sched.chat_id,
+        text,
+        parse_mode: "HTML",
+        status: "pending",
+      });
+    }
+    return { ok: true, id: sched.id, sent: !!text };
   } catch (e) {
     console.error("processSchedule error", sched.id, e);
     return { ok: false, id: sched.id, error: e instanceof Error ? e.message : String(e) };
@@ -261,7 +310,21 @@ serve(async (req) => {
       const { data: s, error } = await admin
         .from("telegram_schedules").select("*").eq("id", body.schedule_id).single();
       if (error || !s) return new Response(JSON.stringify({ error: "schedule not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const text = await buildMessage(admin, s);
+      let text = await buildMessage(admin, s);
+      if (!text && s.kind === "price_cross") {
+        // Para teste, força mensagem informativa do estado atual
+        const cfg = s.config ?? {};
+        const { data: asset } = await admin
+          .from("assets").select("current_price").eq("user_id", s.user_id).eq("ticker", String(cfg.ticker ?? "").toUpperCase()).maybeSingle();
+        const price = Number(asset?.current_price ?? 0);
+        text = `<b>🧪 Teste — ${escapeHtml(String(cfg.ticker ?? ""))}</b>\n\n` +
+          `Preço atual: <b>${fmtBRL(price)}</b>\n` +
+          `Alvo: ${cfg.direction === "below" ? "abaixo de" : "acima de"} <b>${fmtBRL(Number(cfg.threshold_price ?? 0))}</b>\n` +
+          `<i>O alerta dispara apenas quando o preço cruza o alvo.</i>`;
+      }
+      if (!text) {
+        return new Response(JSON.stringify({ ok: false, reason: "no message produced" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       await admin.from("telegram_outbox").insert({
         user_id: s.user_id, chat_id: s.chat_id, text, parse_mode: "HTML", status: "pending",
       });
