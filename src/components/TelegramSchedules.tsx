@@ -363,13 +363,23 @@ export function TelegramSchedules() {
                     <Badge variant="secondary" className="text-xs">{KIND_LABEL[s.kind]}</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
-                    {s.mode === "interval"
-                      ? `A cada ${s.interval_hours}h`
-                      : `Horários: ${(s.daily_times ?? []).join(", ") || "—"}`}
-                    {" · "}
-                    {s.weekdays?.length === 7 ? "todos os dias" : s.weekdays.map(w => WEEKDAYS.find(x => x.v === w)?.label).join("/")}
-                    {" · "}
-                    para <span className="font-medium">{chatLabel(s.chat_id)}</span>
+                    {s.kind === "price_cross" ? (
+                      <>
+                        {s.config?.ticker} {s.config?.direction === "below" ? "abaixo de" : "acima de"} <b>R$ {Number(s.config?.threshold_price ?? 0).toFixed(2)}</b>
+                        {" · "}verifica a cada minuto
+                        {" · "}para <span className="font-medium">{chatLabel(s.chat_id)}</span>
+                      </>
+                    ) : (
+                      <>
+                        {s.mode === "interval"
+                          ? `A cada ${s.interval_hours}h`
+                          : `Horários: ${(s.daily_times ?? []).join(", ") || "—"}`}
+                        {" · "}
+                        {s.weekdays?.length === 7 ? "todos os dias" : s.weekdays.map(w => WEEKDAYS.find(x => x.v === w)?.label).join("/")}
+                        {" · "}
+                        para <span className="font-medium">{chatLabel(s.chat_id)}</span>
+                      </>
+                    )}
                   </div>
                   {s.next_run_at && s.enabled && (
                     <div className="text-xs text-muted-foreground mt-0.5">
@@ -414,6 +424,7 @@ export function TelegramSchedules() {
                     <SelectItem value="patrimony">💰 Patrimônio + variação do dia</SelectItem>
                     <SelectItem value="dividends_month">💵 Dividendos do mês</SelectItem>
                     <SelectItem value="top_movers">📊 Top movimentações</SelectItem>
+                    <SelectItem value="price_cross">🎯 Cruzamento de preço (ticker)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -430,6 +441,44 @@ export function TelegramSchedules() {
                 </Select>
               </div>
 
+              {form.kind === "price_cross" ? (
+                <div className="space-y-3 rounded-md border p-3">
+                  <div className="text-xs text-muted-foreground">
+                    Verifica o preço atual do ticker a cada minuto e dispara <b>uma única vez</b> quando o preço cruza o alvo.
+                    Se voltar e cruzar de novo, dispara novamente.
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Ticker</Label>
+                      <Input
+                        placeholder="Ex.: PETR4"
+                        value={form.ticker}
+                        onChange={e => setForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Direção</Label>
+                      <Select value={form.direction} onValueChange={(v: "above"|"below") => setForm(f => ({ ...f, direction: v }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="above">⬆️ Acima de</SelectItem>
+                          <SelectItem value="below">⬇️ Abaixo de</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Preço-alvo (R$)</Label>
+                    <Input
+                      type="number" step="0.01" min="0"
+                      placeholder="Ex.: 32.50"
+                      value={form.threshold_price}
+                      onChange={e => setForm(f => ({ ...f, threshold_price: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              ) : (
+              <>
               <div className="space-y-1.5">
                 <Label>Recorrência</Label>
                 <Select value={form.mode} onValueChange={(v: Mode) => setForm(f => ({ ...f, mode: v }))}>
@@ -489,6 +538,8 @@ export function TelegramSchedules() {
                   ))}
                 </div>
               </div>
+              </>
+              )}
 
               <div className="flex items-center justify-between rounded-md border p-3">
                 <Label htmlFor="enabled-sched" className="cursor-pointer">Ativo</Label>
