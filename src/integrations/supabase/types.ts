@@ -497,6 +497,7 @@ export type Database = {
       telegram_schedules: {
         Row: {
           chat_id: number
+          config: Json
           created_at: string
           daily_times: string[]
           enabled: boolean
@@ -507,12 +508,14 @@ export type Database = {
           mode: string
           name: string
           next_run_at: string | null
+          state: Json
           updated_at: string
           user_id: string
           weekdays: number[]
         }
         Insert: {
           chat_id: number
+          config?: Json
           created_at?: string
           daily_times?: string[]
           enabled?: boolean
@@ -523,12 +526,14 @@ export type Database = {
           mode?: string
           name: string
           next_run_at?: string | null
+          state?: Json
           updated_at?: string
           user_id: string
           weekdays?: number[]
         }
         Update: {
           chat_id?: number
+          config?: Json
           created_at?: string
           daily_times?: string[]
           enabled?: boolean
@@ -539,6 +544,7 @@ export type Database = {
           mode?: string
           name?: string
           next_run_at?: string | null
+          state?: Json
           updated_at?: string
           user_id?: string
           weekdays?: number[]
