@@ -36,9 +36,13 @@ function escapeHtml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-async function sendMessage(chatId: number, text: string) {
+async function sendMessage(chatId: number, text: string, replyMarkup?: any) {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
   const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY")!;
+  const body: any = {
+    chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true,
+  };
+  if (replyMarkup) body.reply_markup = replyMarkup;
   await fetch(`${GATEWAY_URL}/sendMessage`, {
     method: "POST",
     headers: {
@@ -46,10 +50,59 @@ async function sendMessage(chatId: number, text: string) {
       "X-Connection-Api-Key": TELEGRAM_API_KEY,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true,
-    }),
+    body: JSON.stringify(body),
   });
+}
+
+async function answerCallbackQuery(callbackId: string, text?: string) {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
+  const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY")!;
+  await fetch(`${GATEWAY_URL}/answerCallbackQuery`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "X-Connection-Api-Key": TELEGRAM_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ callback_query_id: callbackId, text: text ?? "" }),
+  });
+}
+
+const MAIN_MENU_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: "💰 Patrimônio", callback_data: "cmd:patrimonio" },
+      { text: "💵 Dividendos", callback_data: "cmd:dividendos" },
+    ],
+    [
+      { text: "🏆 Top 5", callback_data: "cmd:top" },
+      { text: "📉 Piores 5", callback_data: "cmd:piores" },
+    ],
+    [
+      { text: "➕ Lançar dividendo", callback_data: "flow:dividendo" },
+    ],
+    [
+      { text: "🟢 Registrar compra", callback_data: "flow:compra" },
+      { text: "🔴 Registrar venda", callback_data: "flow:venda" },
+    ],
+    [
+      { text: "🔔 Alertas", callback_data: "cmd:alertas" },
+      { text: "📄 Relatório IA", callback_data: "cmd:relatorio" },
+    ],
+  ],
+};
+
+const CANCEL_KEYBOARD = {
+  inline_keyboard: [[{ text: "❌ Cancelar", callback_data: "flow:cancel" }]],
+};
+
+function confirmKeyboard() {
+  return {
+    inline_keyboard: [[
+      { text: "✅ Confirmar", callback_data: "flow:confirm" },
+      { text: "❌ Cancelar", callback_data: "flow:cancel" },
+    ]],
+  };
 }
 
 // Mirror frontend applyTransactions
@@ -233,6 +286,203 @@ function detectAssetType(ticker: string): string {
   return "acoes";
 }
 
+// ===== Helpers para commit (compartilhados entre comandos texto e fluxos por botão) =====
+async function commitDividend(admin: any, userId: number | string, ticker: string, amount: number, dateInfo: { ymd: string; year: number; month: number }) {
+  const { error } = await admin.from("dividends").insert({
+    user_id: userId, ticker, amount,
+    year: dateInfo.year, month: dateInfo.month, payment_date: dateInfo.ymd,
+  });
+  if (error) throw error;
+  const { data: monthDivs } = await admin.from("dividends")
+    .select("amount").eq("user_id", userId)
+    .eq("year", dateInfo.year).eq("month", dateInfo.month);
+  return (monthDivs ?? []).reduce((s: number, d: any) => s + Number(d.amount), 0);
+}
+
+async function commitTransaction(
+  admin: any, userId: string, type: "buy" | "sell",
+  ticker: string, qty: number, price: number, costs: number,
+  dateInfo: { ymd: string; year: number; month: number },
+) {
+  const { data: existingAsset } = await admin
+    .from("assets").select("ticker").eq("user_id", userId).eq("ticker", ticker).maybeSingle();
+  const assetType = detectAssetType(ticker);
+  const total = type === "buy" ? qty * price + costs : qty * price - costs;
+  const { error } = await admin.from("transactions").insert({
+    user_id: userId, type, asset_type: assetType, ticker,
+    date: dateInfo.ymd, quantity: qty, price, other_costs: costs, total,
+  });
+  if (error) throw error;
+  if (type === "buy" && !existingAsset) {
+    await admin.from("assets").insert({
+      user_id: userId, ticker, quantity: 0, current_price: price,
+      average_price: 0, total_invested: 0, dividend_yield: 0, pvp: 0, is_manual_price: true,
+    });
+  }
+  return { assetType, total, isNewAsset: !existingAsset };
+}
+
+// ===== Sessão do fluxo interativo =====
+async function getSession(admin: any, chatId: number) {
+  const { data } = await admin.from("telegram_sessions").select("*").eq("chat_id", chatId).maybeSingle();
+  return data;
+}
+async function setSession(admin: any, userId: string, chatId: number, flow: string, step: string, data: any) {
+  await admin.from("telegram_sessions").upsert({
+    user_id: userId, chat_id: chatId, flow, step, data,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "chat_id" });
+}
+async function clearSession(admin: any, chatId: number) {
+  await admin.from("telegram_sessions").delete().eq("chat_id", chatId);
+}
+
+async function startFlow(admin: any, userId: string, chatId: number, flow: "dividendo" | "compra" | "venda") {
+  await setSession(admin, userId, chatId, flow, "ticker", {});
+  const label = flow === "dividendo" ? "lançar dividendo" : flow === "compra" ? "registrar compra" : "registrar venda";
+  await sendMessage(chatId,
+    `📝 <b>Vamos ${label}</b>\n\nPasso 1/${flow === "dividendo" ? 3 : 5}: digite o <b>ticker</b> (ex.: MXRF11, BBAS3)`,
+    CANCEL_KEYBOARD);
+}
+
+async function handleFlowMessage(admin: any, link: any, chatId: number, text: string): Promise<boolean> {
+  const session = await getSession(admin, chatId);
+  if (!session) return false;
+  // commands cancel any flow except /cancelar handled below
+  const trimmed = text.trim();
+  if (trimmed.startsWith("/")) {
+    if (trimmed.toLowerCase().startsWith("/cancelar")) {
+      await clearSession(admin, chatId);
+      await sendMessage(chatId, `❌ Operação cancelada.`);
+      return true;
+    }
+    return false; // let normal command run; we keep session to allow continuation
+  }
+  const data = session.data || {};
+  const flow = session.flow as "dividendo" | "compra" | "venda";
+
+  if (session.step === "ticker") {
+    const ticker = trimmed.toUpperCase().replace(/\s+/g, "");
+    if (!/^[A-Z0-9]{2,8}$/.test(ticker)) {
+      await sendMessage(chatId, `❌ Ticker inválido. Tente novamente.`, CANCEL_KEYBOARD);
+      return true;
+    }
+    data.ticker = ticker;
+    if (flow === "dividendo") {
+      await setSession(admin, link.user_id, chatId, flow, "amount", data);
+      await sendMessage(chatId, `Passo 2/3: digite o <b>valor</b> recebido (ex.: 12,50)`, CANCEL_KEYBOARD);
+    } else {
+      await setSession(admin, link.user_id, chatId, flow, "qty", data);
+      await sendMessage(chatId, `Passo 2/5: digite a <b>quantidade</b> (ex.: 10)`, CANCEL_KEYBOARD);
+    }
+    return true;
+  }
+
+  if (session.step === "amount") {
+    const amount = parseNum(trimmed);
+    if (!amount || amount <= 0) { await sendMessage(chatId, `❌ Valor inválido. Tente novamente.`, CANCEL_KEYBOARD); return true; }
+    data.amount = amount;
+    await setSession(admin, link.user_id, chatId, flow, "date", data);
+    await sendMessage(chatId, `Passo 3/3: digite a <b>data</b> (DD/MM/AAAA) ou envie <code>hoje</code>.`, CANCEL_KEYBOARD);
+    return true;
+  }
+
+  if (session.step === "qty") {
+    const qty = parseNum(trimmed);
+    if (!qty || qty <= 0) { await sendMessage(chatId, `❌ Quantidade inválida.`, CANCEL_KEYBOARD); return true; }
+    data.qty = qty;
+    await setSession(admin, link.user_id, chatId, flow, "price", data);
+    await sendMessage(chatId, `Passo 3/5: digite o <b>preço unitário</b> (ex.: 28,50)`, CANCEL_KEYBOARD);
+    return true;
+  }
+
+  if (session.step === "price") {
+    const price = parseNum(trimmed);
+    if (!price || price <= 0) { await sendMessage(chatId, `❌ Preço inválido.`, CANCEL_KEYBOARD); return true; }
+    data.price = price;
+    await setSession(admin, link.user_id, chatId, flow, "costs", data);
+    await sendMessage(chatId, `Passo 4/5: <b>outros custos</b> (taxas)? Envie o valor ou <code>0</code>.`, CANCEL_KEYBOARD);
+    return true;
+  }
+
+  if (session.step === "costs") {
+    const costs = parseNum(trimmed) ?? 0;
+    if (costs < 0) { await sendMessage(chatId, `❌ Valor inválido.`, CANCEL_KEYBOARD); return true; }
+    data.costs = costs;
+    await setSession(admin, link.user_id, chatId, flow, "date", data);
+    await sendMessage(chatId, `Passo 5/5: digite a <b>data</b> (DD/MM/AAAA) ou envie <code>hoje</code>.`, CANCEL_KEYBOARD);
+    return true;
+  }
+
+  if (session.step === "date") {
+    let dateInfo;
+    try { dateInfo = parseDateBRT(trimmed.toLowerCase() === "hoje" ? undefined : trimmed); }
+    catch { await sendMessage(chatId, `❌ Data inválida. Use DD/MM/AAAA.`, CANCEL_KEYBOARD); return true; }
+    data.dateInfo = dateInfo;
+    await setSession(admin, link.user_id, chatId, flow, "confirm", data);
+    let summary = "";
+    if (flow === "dividendo") {
+      summary = `<b>Confirmar dividendo</b>\n\n` +
+        `Ativo: <b>${escapeHtml(data.ticker)}</b>\n` +
+        `Valor: ${fmtBRL(data.amount)}\n` +
+        `Data: ${dateInfo.ymd.split("-").reverse().join("/")}`;
+    } else {
+      const totalPrev = (data.qty * data.price) + (flow === "compra" ? data.costs : -data.costs);
+      summary = `<b>Confirmar ${flow === "compra" ? "compra 🟢" : "venda 🔴"}</b>\n\n` +
+        `Ativo: <b>${escapeHtml(data.ticker)}</b>\n` +
+        `Qtd: ${data.qty}\n` +
+        `Preço: ${fmtBRL(data.price)}\n` +
+        (data.costs > 0 ? `Custos: ${fmtBRL(data.costs)}\n` : "") +
+        `Total: <b>${fmtBRL(totalPrev)}</b>\n` +
+        `Data: ${dateInfo.ymd.split("-").reverse().join("/")}`;
+    }
+    await sendMessage(chatId, summary, confirmKeyboard());
+    return true;
+  }
+
+  return false;
+}
+
+async function handleFlowConfirm(admin: any, link: any, chatId: number) {
+  const session = await getSession(admin, chatId);
+  if (!session || session.step !== "confirm") {
+    await sendMessage(chatId, `Nada para confirmar.`);
+    return;
+  }
+  const { flow, data } = session;
+  try {
+    if (flow === "dividendo") {
+      const total = await commitDividend(admin, link.user_id, data.ticker, data.amount, data.dateInfo);
+      await clearSession(admin, chatId);
+      await sendMessage(chatId,
+        `✅ <b>Dividendo lançado</b>\n\n` +
+        `Ativo: <b>${escapeHtml(data.ticker)}</b>\n` +
+        `Valor: ${fmtBRL(data.amount)}\n` +
+        `Data: ${data.dateInfo.ymd.split("-").reverse().join("/")}\n\n` +
+        `Total ${String(data.dateInfo.month).padStart(2, "0")}/${data.dateInfo.year}: <b>${fmtBRL(total)}</b>`,
+        MAIN_MENU_KEYBOARD);
+    } else {
+      const type: "buy" | "sell" = flow === "compra" ? "buy" : "sell";
+      const r = await commitTransaction(admin, link.user_id, type, data.ticker, data.qty, data.price, data.costs ?? 0, data.dateInfo);
+      await clearSession(admin, chatId);
+      const icon = type === "buy" ? "🟢" : "🔴";
+      const label = type === "buy" ? "Compra" : "Venda";
+      await sendMessage(chatId,
+        `${icon} <b>${label} registrada</b>\n\n` +
+        `Ativo: <b>${escapeHtml(data.ticker)}</b> (${r.assetType})\n` +
+        `Qtd: ${data.qty}\n` +
+        `Preço: ${fmtBRL(data.price)}\n` +
+        (data.costs > 0 ? `Custos: ${fmtBRL(data.costs)}\n` : "") +
+        `Total: <b>${fmtBRL(r.total)}</b>\n` +
+        `Data: ${data.dateInfo.ymd.split("-").reverse().join("/")}` +
+        (type === "buy" && r.isNewAsset ? `\n\nℹ️ Ativo criado na carteira. Atualize cotação/DY no app.` : ""),
+        MAIN_MENU_KEYBOARD);
+    }
+  } catch (e: any) {
+    await sendMessage(chatId, `❌ Erro ao salvar: ${escapeHtml(e?.message ?? String(e))}`);
+  }
+}
+
 async function handleCommand(admin: any, chatId: number, fromUser: any, text: string) {
   const trimmed = text.trim();
   const parts = trimmed.split(/\s+/);
@@ -291,6 +541,7 @@ async function handleCommand(admin: any, chatId: number, fromUser: any, text: st
   if (cmd === "/ajuda" || cmd === "/help") {
     await sendMessage(chatId,
       `<b>Comandos disponíveis</b>\n\n` +
+      `/menu — abre o menu com botões 👇\n` +
       `/patrimonio — saldo total e variação\n` +
       `/dividendos — recebidos no mês + meta\n` +
       `/alertas — últimos alertas não lidos\n` +
@@ -300,6 +551,7 @@ async function handleCommand(admin: any, chatId: number, fromUser: any, text: st
       `/dividendo TICKER VALOR [DD/MM/AAAA] — lança um provento recebido\n` +
       `/compra TICKER QTD PRECO [CUSTOS] [DD/MM/AAAA] — registra compra\n` +
       `/venda TICKER QTD PRECO [CUSTOS] [DD/MM/AAAA] — registra venda\n` +
+      `/cancelar — cancela operação em andamento\n` +
       `/desvincular — remove vínculo deste chat\n` +
       `/ajuda — esta mensagem`);
     return;
@@ -316,6 +568,21 @@ async function handleCommand(admin: any, chatId: number, fromUser: any, text: st
     await sendMessage(chatId, `🔌 Desvinculado. Até a próxima!`);
     return;
   }
+
+  if (cmd === "/menu" || cmd === "/start") {
+    await sendMessage(chatId, `<b>📋 Menu principal</b>\n\nEscolha uma opção:`, MAIN_MENU_KEYBOARD);
+    return;
+  }
+
+  if (cmd === "/cancelar") {
+    await clearSession(admin, chatId);
+    await sendMessage(chatId, `❌ Operação cancelada.`);
+    return;
+  }
+
+  if (cmd === "/lancar_dividendo") { await startFlow(admin, link.user_id, chatId, "dividendo"); return; }
+  if (cmd === "/lancar_compra") { await startFlow(admin, link.user_id, chatId, "compra"); return; }
+  if (cmd === "/lancar_venda") { await startFlow(admin, link.user_id, chatId, "venda"); return; }
 
   if (cmd === "/patrimonio") {
     const t = await getPortfolioTotals(admin, link.user_id);
@@ -583,7 +850,7 @@ serve(async () => {
         "X-Connection-Api-Key": TELEGRAM_API_KEY,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ offset: currentOffset, timeout, allowed_updates: ["message"] }),
+      body: JSON.stringify({ offset: currentOffset, timeout, allowed_updates: ["message", "callback_query"] }),
     });
     const data = await r.json();
     if (!r.ok || !data.ok) {
@@ -594,14 +861,46 @@ serve(async () => {
     if (updates.length === 0) continue;
 
     for (const u of updates) {
-      const msg = u.message;
-      if (msg?.text) {
-        try {
-          await handleCommand(admin, msg.chat.id, msg.from, msg.text);
+      try {
+        if (u.callback_query) {
+          const cq = u.callback_query;
+          const chatId = cq.message?.chat?.id;
+          const dataStr: string = cq.data ?? "";
+          await answerCallbackQuery(cq.id);
+          if (!chatId) continue;
+          const { data: link } = await admin
+            .from("telegram_links").select("*").eq("chat_id", chatId).maybeSingle();
+          if (!link) {
+            await sendMessage(chatId, `🔒 Vincule este chat primeiro com /start SEUCODIGO.`);
+          } else if (dataStr.startsWith("cmd:")) {
+            const cmd = "/" + dataStr.slice(4);
+            await handleCommand(admin, chatId, cq.from, cmd);
+          } else if (dataStr === "flow:dividendo") {
+            await startFlow(admin, link.user_id, chatId, "dividendo");
+          } else if (dataStr === "flow:compra") {
+            await startFlow(admin, link.user_id, chatId, "compra");
+          } else if (dataStr === "flow:venda") {
+            await startFlow(admin, link.user_id, chatId, "venda");
+          } else if (dataStr === "flow:cancel") {
+            await clearSession(admin, chatId);
+            await sendMessage(chatId, `❌ Operação cancelada.`);
+          } else if (dataStr === "flow:confirm") {
+            await handleFlowConfirm(admin, link, chatId);
+          }
           totalProcessed++;
-        } catch (e) {
-          console.error("handleCommand error", e);
+        } else {
+          const msg = u.message;
+          if (msg?.text) {
+            const chatId = msg.chat.id;
+            const { data: link } = await admin
+              .from("telegram_links").select("*").eq("chat_id", chatId).maybeSingle();
+            const handled = link ? await handleFlowMessage(admin, link, chatId, msg.text) : false;
+            if (!handled) await handleCommand(admin, chatId, msg.from, msg.text);
+            totalProcessed++;
+          }
         }
+      } catch (e) {
+        console.error("update handler error", e);
       }
     }
     const newOffset = Math.max(...updates.map((u: any) => u.update_id)) + 1;
