@@ -190,6 +190,49 @@ function nowBRTMonthYear() {
   return { year, month };
 }
 
+// Parse number that may use BRL ("1.234,56") or US ("1234.56") format
+function parseNum(s: string): number | null {
+  if (!s) return null;
+  let str = s.trim().replace(/[R$\s]/gi, "");
+  if (str.includes(",") && str.includes(".")) {
+    // assume "1.234,56" → remove thousand dots, then comma→dot
+    str = str.replace(/\./g, "").replace(",", ".");
+  } else if (str.includes(",")) {
+    str = str.replace(",", ".");
+  }
+  const n = Number(str);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Parse date "DD/MM/AAAA" or "AAAA-MM-DD" or "DD/MM" (current year). Returns BRT-local YYYY-MM-DD.
+function parseDateBRT(s?: string): { ymd: string; year: number; month: number } {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  if (!s) {
+    const [y, m] = today.split("-");
+    return { ymd: today, year: Number(y), month: Number(m) };
+  }
+  let y: number, mo: number, d: number;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    [y, mo, d] = s.split("-").map(Number);
+  } else {
+    const parts = s.split("/").map(Number);
+    if (parts.length === 3) { d = parts[0]; mo = parts[1]; y = parts[2]; }
+    else if (parts.length === 2) { d = parts[0]; mo = parts[1]; y = Number(today.split("-")[0]); }
+    else throw new Error("Data inválida");
+  }
+  if (!y || !mo || !d) throw new Error("Data inválida");
+  const ymd = `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  return { ymd, year: y, month: mo };
+}
+
+function detectAssetType(ticker: string): string {
+  const t = ticker.toUpperCase();
+  if (/11$/.test(t)) return "fiis";
+  if (/34$/.test(t) || /35$/.test(t)) return "bdrs";
+  if (/^[A-Z]{4}\d{1,2}$/.test(t)) return "acoes";
+  return "acoes";
+}
+
 async function handleCommand(admin: any, chatId: number, fromUser: any, text: string) {
   const trimmed = text.trim();
   const parts = trimmed.split(/\s+/);
