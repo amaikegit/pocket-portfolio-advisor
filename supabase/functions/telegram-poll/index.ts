@@ -541,6 +541,7 @@ async function handleCommand(admin: any, chatId: number, fromUser: any, text: st
   if (cmd === "/ajuda" || cmd === "/help") {
     await sendMessage(chatId,
       `<b>Comandos disponíveis</b>\n\n` +
+      `/menu — abre o menu com botões 👇\n` +
       `/patrimonio — saldo total e variação\n` +
       `/dividendos — recebidos no mês + meta\n` +
       `/alertas — últimos alertas não lidos\n` +
@@ -550,6 +551,7 @@ async function handleCommand(admin: any, chatId: number, fromUser: any, text: st
       `/dividendo TICKER VALOR [DD/MM/AAAA] — lança um provento recebido\n` +
       `/compra TICKER QTD PRECO [CUSTOS] [DD/MM/AAAA] — registra compra\n` +
       `/venda TICKER QTD PRECO [CUSTOS] [DD/MM/AAAA] — registra venda\n` +
+      `/cancelar — cancela operação em andamento\n` +
       `/desvincular — remove vínculo deste chat\n` +
       `/ajuda — esta mensagem`);
     return;
