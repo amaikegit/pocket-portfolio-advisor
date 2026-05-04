@@ -850,7 +850,7 @@ serve(async () => {
         "X-Connection-Api-Key": TELEGRAM_API_KEY,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ offset: currentOffset, timeout, allowed_updates: ["message"] }),
+      body: JSON.stringify({ offset: currentOffset, timeout, allowed_updates: ["message", "callback_query"] }),
     });
     const data = await r.json();
     if (!r.ok || !data.ok) {
@@ -861,14 +861,46 @@ serve(async () => {
     if (updates.length === 0) continue;
 
     for (const u of updates) {
-      const msg = u.message;
-      if (msg?.text) {
-        try {
-          await handleCommand(admin, msg.chat.id, msg.from, msg.text);
+      try {
+        if (u.callback_query) {
+          const cq = u.callback_query;
+          const chatId = cq.message?.chat?.id;
+          const dataStr: string = cq.data ?? "";
+          await answerCallbackQuery(cq.id);
+          if (!chatId) continue;
+          const { data: link } = await admin
+            .from("telegram_links").select("*").eq("chat_id", chatId).maybeSingle();
+          if (!link) {
+            await sendMessage(chatId, `🔒 Vincule este chat primeiro com /start SEUCODIGO.`);
+          } else if (dataStr.startsWith("cmd:")) {
+            const cmd = "/" + dataStr.slice(4);
+            await handleCommand(admin, chatId, cq.from, cmd);
+          } else if (dataStr === "flow:dividendo") {
+            await startFlow(admin, link.user_id, chatId, "dividendo");
+          } else if (dataStr === "flow:compra") {
+            await startFlow(admin, link.user_id, chatId, "compra");
+          } else if (dataStr === "flow:venda") {
+            await startFlow(admin, link.user_id, chatId, "venda");
+          } else if (dataStr === "flow:cancel") {
+            await clearSession(admin, chatId);
+            await sendMessage(chatId, `❌ Operação cancelada.`);
+          } else if (dataStr === "flow:confirm") {
+            await handleFlowConfirm(admin, link, chatId);
+          }
           totalProcessed++;
-        } catch (e) {
-          console.error("handleCommand error", e);
+        } else {
+          const msg = u.message;
+          if (msg?.text) {
+            const chatId = msg.chat.id;
+            const { data: link } = await admin
+              .from("telegram_links").select("*").eq("chat_id", chatId).maybeSingle();
+            const handled = link ? await handleFlowMessage(admin, link, chatId, msg.text) : false;
+            if (!handled) await handleCommand(admin, chatId, msg.from, msg.text);
+            totalProcessed++;
+          }
         }
+      } catch (e) {
+        console.error("update handler error", e);
       }
     }
     const newOffset = Math.max(...updates.map((u: any) => u.update_id)) + 1;
