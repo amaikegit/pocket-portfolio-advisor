@@ -416,6 +416,116 @@ async function handleCommand(admin: any, chatId: number, fromUser: any, text: st
     return;
   }
 
+  if (cmd === "/dividendo" || cmd === "/dividendos_lancar" || cmd === "/prov") {
+    // /dividendo TICKER VALOR [DD/MM/AAAA]
+    if (parts.length < 3) {
+      await sendMessage(chatId,
+        `Uso: <code>/dividendo TICKER VALOR [DD/MM/AAAA]</code>\n` +
+        `Ex.: <code>/dividendo MXRF11 12,50 15/04/2026</code>`);
+      return;
+    }
+    const ticker = parts[1].toUpperCase();
+    const amount = parseNum(parts[2]);
+    if (amount === null || amount <= 0) {
+      await sendMessage(chatId, `❌ Valor inválido: <code>${escapeHtml(parts[2])}</code>`);
+      return;
+    }
+    let dateInfo;
+    try { dateInfo = parseDateBRT(parts[3]); } catch { await sendMessage(chatId, `❌ Data inválida. Use DD/MM/AAAA.`); return; }
+    const { error } = await admin.from("dividends").insert({
+      user_id: link.user_id,
+      ticker,
+      amount,
+      year: dateInfo.year,
+      month: dateInfo.month,
+      payment_date: dateInfo.ymd,
+    });
+    if (error) { await sendMessage(chatId, `❌ Erro ao lançar: ${escapeHtml(error.message)}`); return; }
+    // Monthly total after insert
+    const { data: monthDivs } = await admin.from("dividends")
+      .select("amount").eq("user_id", link.user_id)
+      .eq("year", dateInfo.year).eq("month", dateInfo.month);
+    const total = (monthDivs ?? []).reduce((s: number, d: any) => s + Number(d.amount), 0);
+    await sendMessage(chatId,
+      `✅ <b>Dividendo lançado</b>\n\n` +
+      `Ativo: <b>${escapeHtml(ticker)}</b>\n` +
+      `Valor: ${fmtBRL(amount)}\n` +
+      `Data: ${dateInfo.ymd.split("-").reverse().join("/")}\n\n` +
+      `Total ${String(dateInfo.month).padStart(2, "0")}/${dateInfo.year}: <b>${fmtBRL(total)}</b>`);
+    return;
+  }
+
+  if (cmd === "/compra" || cmd === "/venda") {
+    // /compra TICKER QTD PRECO [CUSTOS] [DD/MM/AAAA]
+    if (parts.length < 4) {
+      await sendMessage(chatId,
+        `Uso: <code>${cmd} TICKER QTD PRECO [CUSTOS] [DD/MM/AAAA]</code>\n` +
+        `Ex.: <code>${cmd} BBAS3 10 28,50 5,90 03/05/2026</code>`);
+      return;
+    }
+    const type = cmd === "/compra" ? "buy" : "sell";
+    const ticker = parts[1].toUpperCase();
+    const qty = parseNum(parts[2]);
+    const price = parseNum(parts[3]);
+    if (!qty || qty <= 0) { await sendMessage(chatId, `❌ Quantidade inválida.`); return; }
+    if (!price || price <= 0) { await sendMessage(chatId, `❌ Preço inválido.`); return; }
+
+    // Detect optional custos and date among parts[4], parts[5]
+    let costs = 0;
+    let dateStr: string | undefined;
+    for (const p of parts.slice(4)) {
+      if (/[\/\-]/.test(p)) dateStr = p;
+      else {
+        const n = parseNum(p);
+        if (n !== null) costs = n;
+      }
+    }
+    let dateInfo;
+    try { dateInfo = parseDateBRT(dateStr); } catch { await sendMessage(chatId, `❌ Data inválida. Use DD/MM/AAAA.`); return; }
+
+    // Look up existing asset to inherit asset_type
+    const { data: existingAsset } = await admin
+      .from("assets").select("ticker").eq("user_id", link.user_id).eq("ticker", ticker).maybeSingle();
+    const assetType = detectAssetType(ticker);
+
+    const total = type === "buy" ? qty * price + costs : qty * price - costs;
+    const { error } = await admin.from("transactions").insert({
+      user_id: link.user_id,
+      type, asset_type: assetType, ticker,
+      date: dateInfo.ymd,
+      quantity: qty, price, other_costs: costs, total,
+    });
+    if (error) { await sendMessage(chatId, `❌ Erro ao registrar: ${escapeHtml(error.message)}`); return; }
+
+    // If buying a new ticker, create asset row so it appears in the portfolio
+    if (type === "buy" && !existingAsset) {
+      await admin.from("assets").insert({
+        user_id: link.user_id,
+        ticker,
+        quantity: 0,
+        current_price: price,
+        average_price: 0,
+        total_invested: 0,
+        dividend_yield: 0,
+        pvp: 0,
+        is_manual_price: true,
+      });
+    }
+
+    const icon = type === "buy" ? "🟢" : "🔴";
+    const label = type === "buy" ? "Compra" : "Venda";
+    await sendMessage(chatId,
+      `${icon} <b>${label} registrada</b>\n\n` +
+      `Ativo: <b>${escapeHtml(ticker)}</b> (${assetType})\n` +
+      `Qtd: ${qty}\n` +
+      `Preço: ${fmtBRL(price)}\n` +
+      (costs > 0 ? `Custos: ${fmtBRL(costs)}\n` : "") +
+      `Total: <b>${fmtBRL(total)}</b>\n` +
+      `Data: ${dateInfo.ymd.split("-").reverse().join("/")}` +
+      (type === "buy" && !existingAsset ? `\n\nℹ️ Ativo criado na carteira. Atualize cotação/DY no app.` : ""));
+    return;
+  }
+
   if (cmd === "/relatorio") {
     await sendMessage(chatId, `⏳ Gerando relatório de IA... Isso pode levar até 1 minuto.`);
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
