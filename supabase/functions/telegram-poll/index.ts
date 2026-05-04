@@ -254,6 +254,9 @@ async function handleCommand(admin: any, chatId: number, fromUser: any, text: st
       `/top — 5 melhores ativos (rating ⭐ + valor)\n` +
       `/piores — 5 ativos com pior variação\n` +
       `/relatorio — gera relatório de IA agora\n` +
+      `/dividendo TICKER VALOR [DD/MM/AAAA] — lança um provento recebido\n` +
+      `/compra TICKER QTD PRECO [CUSTOS] [DD/MM/AAAA] — registra compra\n` +
+      `/venda TICKER QTD PRECO [CUSTOS] [DD/MM/AAAA] — registra venda\n` +
       `/desvincular — remove vínculo deste chat\n` +
       `/ajuda — esta mensagem`);
     return;
