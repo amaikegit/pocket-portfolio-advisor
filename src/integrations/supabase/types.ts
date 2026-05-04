@@ -551,6 +551,42 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_sessions: {
+        Row: {
+          chat_id: number
+          created_at: string
+          data: Json
+          flow: string
+          id: string
+          prompt_message_id: number | null
+          step: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chat_id: number
+          created_at?: string
+          data?: Json
+          flow: string
+          id?: string
+          prompt_message_id?: number | null
+          step: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chat_id?: number
+          created_at?: string
+          data?: Json
+          flow?: string
+          id?: string
+          prompt_message_id?: number | null
+          step?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           asset_type: string
