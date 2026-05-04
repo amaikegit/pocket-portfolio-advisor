@@ -569,6 +569,21 @@ async function handleCommand(admin: any, chatId: number, fromUser: any, text: st
     return;
   }
 
+  if (cmd === "/menu" || cmd === "/start") {
+    await sendMessage(chatId, `<b>📋 Menu principal</b>\n\nEscolha uma opção:`, MAIN_MENU_KEYBOARD);
+    return;
+  }
+
+  if (cmd === "/cancelar") {
+    await clearSession(admin, chatId);
+    await sendMessage(chatId, `❌ Operação cancelada.`);
+    return;
+  }
+
+  if (cmd === "/lancar_dividendo") { await startFlow(admin, link.user_id, chatId, "dividendo"); return; }
+  if (cmd === "/lancar_compra") { await startFlow(admin, link.user_id, chatId, "compra"); return; }
+  if (cmd === "/lancar_venda") { await startFlow(admin, link.user_id, chatId, "venda"); return; }
+
   if (cmd === "/patrimonio") {
     const t = await getPortfolioTotals(admin, link.user_id);
     const pct = t.totalInvested > 0 ? ((t.diff / t.totalInvested) * 100).toFixed(2) : "0.00";
