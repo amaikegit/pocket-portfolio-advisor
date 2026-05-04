@@ -36,9 +36,13 @@ function escapeHtml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-async function sendMessage(chatId: number, text: string) {
+async function sendMessage(chatId: number, text: string, replyMarkup?: any) {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
   const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY")!;
+  const body: any = {
+    chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true,
+  };
+  if (replyMarkup) body.reply_markup = replyMarkup;
   await fetch(`${GATEWAY_URL}/sendMessage`, {
     method: "POST",
     headers: {
@@ -46,10 +50,59 @@ async function sendMessage(chatId: number, text: string) {
       "X-Connection-Api-Key": TELEGRAM_API_KEY,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true,
-    }),
+    body: JSON.stringify(body),
   });
+}
+
+async function answerCallbackQuery(callbackId: string, text?: string) {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
+  const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY")!;
+  await fetch(`${GATEWAY_URL}/answerCallbackQuery`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "X-Connection-Api-Key": TELEGRAM_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ callback_query_id: callbackId, text: text ?? "" }),
+  });
+}
+
+const MAIN_MENU_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: "💰 Patrimônio", callback_data: "cmd:patrimonio" },
+      { text: "💵 Dividendos", callback_data: "cmd:dividendos" },
+    ],
+    [
+      { text: "🏆 Top 5", callback_data: "cmd:top" },
+      { text: "📉 Piores 5", callback_data: "cmd:piores" },
+    ],
+    [
+      { text: "➕ Lançar dividendo", callback_data: "flow:dividendo" },
+    ],
+    [
+      { text: "🟢 Registrar compra", callback_data: "flow:compra" },
+      { text: "🔴 Registrar venda", callback_data: "flow:venda" },
+    ],
+    [
+      { text: "🔔 Alertas", callback_data: "cmd:alertas" },
+      { text: "📄 Relatório IA", callback_data: "cmd:relatorio" },
+    ],
+  ],
+};
+
+const CANCEL_KEYBOARD = {
+  inline_keyboard: [[{ text: "❌ Cancelar", callback_data: "flow:cancel" }]],
+};
+
+function confirmKeyboard() {
+  return {
+    inline_keyboard: [[
+      { text: "✅ Confirmar", callback_data: "flow:confirm" },
+      { text: "❌ Cancelar", callback_data: "flow:cancel" },
+    ]],
+  };
 }
 
 // Mirror frontend applyTransactions
