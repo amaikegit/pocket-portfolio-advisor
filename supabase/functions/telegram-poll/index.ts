@@ -938,7 +938,7 @@ serve(async () => {
             const chatId = msg.chat.id;
             const { data: link } = await admin
               .from("telegram_links").select("*").eq("chat_id", chatId).maybeSingle();
-            const handled = link ? await handleFlowMessage(admin, link, chatId, msg.text) : false;
+            const handled = link ? await handleFlowMessage(admin, link, chatId, msg) : false;
             if (!handled) await handleCommand(admin, chatId, msg.from, msg.text);
             totalProcessed++;
           }
