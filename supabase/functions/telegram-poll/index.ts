@@ -376,62 +376,83 @@ async function handleFlowMessage(admin: any, link: any, chatId: number, text: st
   if (session.step === "ticker") {
     const ticker = trimmed.toUpperCase().replace(/\s+/g, "");
     if (!/^[A-Z0-9]{2,8}$/.test(ticker)) {
-      await sendMessage(chatId, `❌ Ticker inválido. Tente novamente.`, CANCEL_KEYBOARD);
+      const mid = await sendMessage(chatId, `❌ Ticker inválido. Responda esta mensagem com o ticker (ex.: MXRF11).`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "ticker", data, mid);
       return true;
     }
     data.ticker = ticker;
     if (flow === "dividendo") {
-      await setSession(admin, link.user_id, chatId, flow, "amount", data);
-      await sendMessage(chatId, `Passo 2/3: digite o <b>valor</b> recebido (ex.: 12,50)`, CANCEL_KEYBOARD);
+      const mid = await sendMessage(chatId, `Passo 2/3: <b>responda</b> com o <b>valor</b> recebido (ex.: 12,50)`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "amount", data, mid);
     } else {
-      await setSession(admin, link.user_id, chatId, flow, "qty", data);
-      await sendMessage(chatId, `Passo 2/5: digite a <b>quantidade</b> (ex.: 10)`, CANCEL_KEYBOARD);
+      const mid = await sendMessage(chatId, `Passo 2/5: <b>responda</b> com a <b>quantidade</b> (ex.: 10)`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "qty", data, mid);
     }
     return true;
   }
 
   if (session.step === "amount") {
     const amount = parseNum(trimmed);
-    if (!amount || amount <= 0) { await sendMessage(chatId, `❌ Valor inválido. Tente novamente.`, CANCEL_KEYBOARD); return true; }
+    if (!amount || amount <= 0) {
+      const mid = await sendMessage(chatId, `❌ Valor inválido. Responda com o valor (ex.: 12,50).`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "amount", data, mid);
+      return true;
+    }
     data.amount = amount;
-    await setSession(admin, link.user_id, chatId, flow, "date", data);
-    await sendMessage(chatId, `Passo 3/3: digite a <b>data</b> (DD/MM/AAAA) ou envie <code>hoje</code>.`, CANCEL_KEYBOARD);
+    const mid = await sendMessage(chatId, `Passo 3/3: <b>responda</b> com a <b>data</b> (DD/MM/AAAA) ou <code>hoje</code>.`, FORCE_REPLY);
+    await setSession(admin, link.user_id, chatId, flow, "date", data, mid);
     return true;
   }
 
   if (session.step === "qty") {
     const qty = parseNum(trimmed);
-    if (!qty || qty <= 0) { await sendMessage(chatId, `❌ Quantidade inválida.`, CANCEL_KEYBOARD); return true; }
+    if (!qty || qty <= 0) {
+      const mid = await sendMessage(chatId, `❌ Quantidade inválida. Responda com a quantidade.`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "qty", data, mid);
+      return true;
+    }
     data.qty = qty;
-    await setSession(admin, link.user_id, chatId, flow, "price", data);
-    await sendMessage(chatId, `Passo 3/5: digite o <b>preço unitário</b> (ex.: 28,50)`, CANCEL_KEYBOARD);
+    const mid = await sendMessage(chatId, `Passo 3/5: <b>responda</b> com o <b>preço unitário</b> (ex.: 28,50)`, FORCE_REPLY);
+    await setSession(admin, link.user_id, chatId, flow, "price", data, mid);
     return true;
   }
 
   if (session.step === "price") {
     const price = parseNum(trimmed);
-    if (!price || price <= 0) { await sendMessage(chatId, `❌ Preço inválido.`, CANCEL_KEYBOARD); return true; }
+    if (!price || price <= 0) {
+      const mid = await sendMessage(chatId, `❌ Preço inválido. Responda com o preço.`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "price", data, mid);
+      return true;
+    }
     data.price = price;
-    await setSession(admin, link.user_id, chatId, flow, "costs", data);
-    await sendMessage(chatId, `Passo 4/5: <b>outros custos</b> (taxas)? Envie o valor ou <code>0</code>.`, CANCEL_KEYBOARD);
+    const mid = await sendMessage(chatId, `Passo 4/5: <b>responda</b> com <b>outros custos</b> (taxas) ou <code>0</code>.`, FORCE_REPLY);
+    await setSession(admin, link.user_id, chatId, flow, "costs", data, mid);
     return true;
   }
 
   if (session.step === "costs") {
     const costs = parseNum(trimmed) ?? 0;
-    if (costs < 0) { await sendMessage(chatId, `❌ Valor inválido.`, CANCEL_KEYBOARD); return true; }
+    if (costs < 0) {
+      const mid = await sendMessage(chatId, `❌ Valor inválido. Responda com 0 ou um valor positivo.`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "costs", data, mid);
+      return true;
+    }
     data.costs = costs;
-    await setSession(admin, link.user_id, chatId, flow, "date", data);
-    await sendMessage(chatId, `Passo 5/5: digite a <b>data</b> (DD/MM/AAAA) ou envie <code>hoje</code>.`, CANCEL_KEYBOARD);
+    const mid = await sendMessage(chatId, `Passo 5/5: <b>responda</b> com a <b>data</b> (DD/MM/AAAA) ou <code>hoje</code>.`, FORCE_REPLY);
+    await setSession(admin, link.user_id, chatId, flow, "date", data, mid);
     return true;
   }
 
   if (session.step === "date") {
     let dateInfo;
     try { dateInfo = parseDateBRT(trimmed.toLowerCase() === "hoje" ? undefined : trimmed); }
-    catch { await sendMessage(chatId, `❌ Data inválida. Use DD/MM/AAAA.`, CANCEL_KEYBOARD); return true; }
+    catch {
+      const mid = await sendMessage(chatId, `❌ Data inválida. Responda com DD/MM/AAAA ou <code>hoje</code>.`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "date", data, mid);
+      return true;
+    }
     data.dateInfo = dateInfo;
-    await setSession(admin, link.user_id, chatId, flow, "confirm", data);
+    await setSession(admin, link.user_id, chatId, flow, "confirm", data, undefined);
     let summary = "";
     if (flow === "dividendo") {
       summary = `<b>Confirmar dividendo</b>\n\n` +
