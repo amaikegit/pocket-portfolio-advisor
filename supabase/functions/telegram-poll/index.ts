@@ -36,14 +36,15 @@ function escapeHtml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-async function sendMessage(chatId: number, text: string, replyMarkup?: any) {
+async function sendMessage(chatId: number, text: string, replyMarkup?: any, replyToMessageId?: number): Promise<number | undefined> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
   const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY")!;
   const body: any = {
     chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true,
   };
   if (replyMarkup) body.reply_markup = replyMarkup;
-  await fetch(`${GATEWAY_URL}/sendMessage`, {
+  if (replyToMessageId) body.reply_to_message_id = replyToMessageId;
+  const r = await fetch(`${GATEWAY_URL}/sendMessage`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -52,6 +53,10 @@ async function sendMessage(chatId: number, text: string, replyMarkup?: any) {
     },
     body: JSON.stringify(body),
   });
+  try {
+    const j = await r.json();
+    return j?.result?.message_id;
+  } catch { return undefined; }
 }
 
 async function answerCallbackQuery(callbackId: string, text?: string) {
@@ -95,6 +100,11 @@ const MAIN_MENU_KEYBOARD = {
 const CANCEL_KEYBOARD = {
   inline_keyboard: [[{ text: "❌ Cancelar", callback_data: "flow:cancel" }]],
 };
+
+// ForceReply faz o cliente Telegram abrir o teclado já em modo "responder"
+// à mensagem do bot. Isso garante que, mesmo em grupos com Privacy Mode
+// ATIVO, a resposta do usuário seja entregue ao bot (porque é um reply).
+const FORCE_REPLY = { force_reply: true, selective: true } as const;
 
 function confirmKeyboard() {
   return {
@@ -327,25 +337,28 @@ async function getSession(admin: any, chatId: number) {
   const { data } = await admin.from("telegram_sessions").select("*").eq("chat_id", chatId).maybeSingle();
   return data;
 }
-async function setSession(admin: any, userId: string, chatId: number, flow: string, step: string, data: any) {
-  await admin.from("telegram_sessions").upsert({
+async function setSession(admin: any, userId: string, chatId: number, flow: string, step: string, data: any, promptMessageId?: number) {
+  const row: any = {
     user_id: userId, chat_id: chatId, flow, step, data,
     updated_at: new Date().toISOString(),
-  }, { onConflict: "chat_id" });
+  };
+  if (promptMessageId !== undefined) row.prompt_message_id = promptMessageId;
+  await admin.from("telegram_sessions").upsert(row, { onConflict: "chat_id" });
 }
 async function clearSession(admin: any, chatId: number) {
   await admin.from("telegram_sessions").delete().eq("chat_id", chatId);
 }
 
 async function startFlow(admin: any, userId: string, chatId: number, flow: "dividendo" | "compra" | "venda") {
-  await setSession(admin, userId, chatId, flow, "ticker", {});
   const label = flow === "dividendo" ? "lançar dividendo" : flow === "compra" ? "registrar compra" : "registrar venda";
-  await sendMessage(chatId,
-    `📝 <b>Vamos ${label}</b>\n\nPasso 1/${flow === "dividendo" ? 3 : 5}: digite o <b>ticker</b> (ex.: MXRF11, BBAS3)`,
-    CANCEL_KEYBOARD);
+  const mid = await sendMessage(chatId,
+    `📝 <b>Vamos ${label}</b>\n\nPasso 1/${flow === "dividendo" ? 3 : 5}: <b>responda esta mensagem</b> com o <b>ticker</b> (ex.: MXRF11, BBAS3).\n\nEnvie /cancelar a qualquer momento.`,
+    FORCE_REPLY);
+  await setSession(admin, userId, chatId, flow, "ticker", {}, mid);
 }
 
-async function handleFlowMessage(admin: any, link: any, chatId: number, text: string): Promise<boolean> {
+async function handleFlowMessage(admin: any, link: any, chatId: number, msg: any): Promise<boolean> {
+  const text: string = msg?.text ?? "";
   const session = await getSession(admin, chatId);
   if (!session) return false;
   // commands cancel any flow except /cancelar handled below
@@ -358,68 +371,99 @@ async function handleFlowMessage(admin: any, link: any, chatId: number, text: st
     }
     return false; // let normal command run; we keep session to allow continuation
   }
+  // Em grupos (chat_id < 0), só aceita mensagens que sejam reply ao prompt do bot.
+  // Isso contorna o Privacy Mode do Telegram, que esconde mensagens normais do bot.
+  const isGroup = chatId < 0;
+  if (isGroup) {
+    const replyTo = msg?.reply_to_message?.message_id;
+    const expected = session.prompt_message_id;
+    if (!replyTo || (expected && replyTo !== expected)) {
+      return false; // ignora — não é resposta ao nosso prompt
+    }
+  }
   const data = session.data || {};
   const flow = session.flow as "dividendo" | "compra" | "venda";
 
   if (session.step === "ticker") {
     const ticker = trimmed.toUpperCase().replace(/\s+/g, "");
     if (!/^[A-Z0-9]{2,8}$/.test(ticker)) {
-      await sendMessage(chatId, `❌ Ticker inválido. Tente novamente.`, CANCEL_KEYBOARD);
+      const mid = await sendMessage(chatId, `❌ Ticker inválido. Responda esta mensagem com o ticker (ex.: MXRF11).`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "ticker", data, mid);
       return true;
     }
     data.ticker = ticker;
     if (flow === "dividendo") {
-      await setSession(admin, link.user_id, chatId, flow, "amount", data);
-      await sendMessage(chatId, `Passo 2/3: digite o <b>valor</b> recebido (ex.: 12,50)`, CANCEL_KEYBOARD);
+      const mid = await sendMessage(chatId, `Passo 2/3: <b>responda</b> com o <b>valor</b> recebido (ex.: 12,50)`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "amount", data, mid);
     } else {
-      await setSession(admin, link.user_id, chatId, flow, "qty", data);
-      await sendMessage(chatId, `Passo 2/5: digite a <b>quantidade</b> (ex.: 10)`, CANCEL_KEYBOARD);
+      const mid = await sendMessage(chatId, `Passo 2/5: <b>responda</b> com a <b>quantidade</b> (ex.: 10)`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "qty", data, mid);
     }
     return true;
   }
 
   if (session.step === "amount") {
     const amount = parseNum(trimmed);
-    if (!amount || amount <= 0) { await sendMessage(chatId, `❌ Valor inválido. Tente novamente.`, CANCEL_KEYBOARD); return true; }
+    if (!amount || amount <= 0) {
+      const mid = await sendMessage(chatId, `❌ Valor inválido. Responda com o valor (ex.: 12,50).`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "amount", data, mid);
+      return true;
+    }
     data.amount = amount;
-    await setSession(admin, link.user_id, chatId, flow, "date", data);
-    await sendMessage(chatId, `Passo 3/3: digite a <b>data</b> (DD/MM/AAAA) ou envie <code>hoje</code>.`, CANCEL_KEYBOARD);
+    const mid = await sendMessage(chatId, `Passo 3/3: <b>responda</b> com a <b>data</b> (DD/MM/AAAA) ou <code>hoje</code>.`, FORCE_REPLY);
+    await setSession(admin, link.user_id, chatId, flow, "date", data, mid);
     return true;
   }
 
   if (session.step === "qty") {
     const qty = parseNum(trimmed);
-    if (!qty || qty <= 0) { await sendMessage(chatId, `❌ Quantidade inválida.`, CANCEL_KEYBOARD); return true; }
+    if (!qty || qty <= 0) {
+      const mid = await sendMessage(chatId, `❌ Quantidade inválida. Responda com a quantidade.`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "qty", data, mid);
+      return true;
+    }
     data.qty = qty;
-    await setSession(admin, link.user_id, chatId, flow, "price", data);
-    await sendMessage(chatId, `Passo 3/5: digite o <b>preço unitário</b> (ex.: 28,50)`, CANCEL_KEYBOARD);
+    const mid = await sendMessage(chatId, `Passo 3/5: <b>responda</b> com o <b>preço unitário</b> (ex.: 28,50)`, FORCE_REPLY);
+    await setSession(admin, link.user_id, chatId, flow, "price", data, mid);
     return true;
   }
 
   if (session.step === "price") {
     const price = parseNum(trimmed);
-    if (!price || price <= 0) { await sendMessage(chatId, `❌ Preço inválido.`, CANCEL_KEYBOARD); return true; }
+    if (!price || price <= 0) {
+      const mid = await sendMessage(chatId, `❌ Preço inválido. Responda com o preço.`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "price", data, mid);
+      return true;
+    }
     data.price = price;
-    await setSession(admin, link.user_id, chatId, flow, "costs", data);
-    await sendMessage(chatId, `Passo 4/5: <b>outros custos</b> (taxas)? Envie o valor ou <code>0</code>.`, CANCEL_KEYBOARD);
+    const mid = await sendMessage(chatId, `Passo 4/5: <b>responda</b> com <b>outros custos</b> (taxas) ou <code>0</code>.`, FORCE_REPLY);
+    await setSession(admin, link.user_id, chatId, flow, "costs", data, mid);
     return true;
   }
 
   if (session.step === "costs") {
     const costs = parseNum(trimmed) ?? 0;
-    if (costs < 0) { await sendMessage(chatId, `❌ Valor inválido.`, CANCEL_KEYBOARD); return true; }
+    if (costs < 0) {
+      const mid = await sendMessage(chatId, `❌ Valor inválido. Responda com 0 ou um valor positivo.`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "costs", data, mid);
+      return true;
+    }
     data.costs = costs;
-    await setSession(admin, link.user_id, chatId, flow, "date", data);
-    await sendMessage(chatId, `Passo 5/5: digite a <b>data</b> (DD/MM/AAAA) ou envie <code>hoje</code>.`, CANCEL_KEYBOARD);
+    const mid = await sendMessage(chatId, `Passo 5/5: <b>responda</b> com a <b>data</b> (DD/MM/AAAA) ou <code>hoje</code>.`, FORCE_REPLY);
+    await setSession(admin, link.user_id, chatId, flow, "date", data, mid);
     return true;
   }
 
   if (session.step === "date") {
     let dateInfo;
     try { dateInfo = parseDateBRT(trimmed.toLowerCase() === "hoje" ? undefined : trimmed); }
-    catch { await sendMessage(chatId, `❌ Data inválida. Use DD/MM/AAAA.`, CANCEL_KEYBOARD); return true; }
+    catch {
+      const mid = await sendMessage(chatId, `❌ Data inválida. Responda com DD/MM/AAAA ou <code>hoje</code>.`, FORCE_REPLY);
+      await setSession(admin, link.user_id, chatId, flow, "date", data, mid);
+      return true;
+    }
     data.dateInfo = dateInfo;
-    await setSession(admin, link.user_id, chatId, flow, "confirm", data);
+    await setSession(admin, link.user_id, chatId, flow, "confirm", data, undefined);
     let summary = "";
     if (flow === "dividendo") {
       summary = `<b>Confirmar dividendo</b>\n\n` +
@@ -894,7 +938,7 @@ serve(async () => {
             const chatId = msg.chat.id;
             const { data: link } = await admin
               .from("telegram_links").select("*").eq("chat_id", chatId).maybeSingle();
-            const handled = link ? await handleFlowMessage(admin, link, chatId, msg.text) : false;
+            const handled = link ? await handleFlowMessage(admin, link, chatId, msg) : false;
             if (!handled) await handleCommand(admin, chatId, msg.from, msg.text);
             totalProcessed++;
           }
