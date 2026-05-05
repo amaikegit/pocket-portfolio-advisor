@@ -357,7 +357,8 @@ async function startFlow(admin: any, userId: string, chatId: number, flow: "divi
   await setSession(admin, userId, chatId, flow, "ticker", {}, mid);
 }
 
-async function handleFlowMessage(admin: any, link: any, chatId: number, text: string): Promise<boolean> {
+async function handleFlowMessage(admin: any, link: any, chatId: number, msg: any): Promise<boolean> {
+  const text: string = msg?.text ?? "";
   const session = await getSession(admin, chatId);
   if (!session) return false;
   // commands cancel any flow except /cancelar handled below
@@ -369,6 +370,16 @@ async function handleFlowMessage(admin: any, link: any, chatId: number, text: st
       return true;
     }
     return false; // let normal command run; we keep session to allow continuation
+  }
+  // Em grupos (chat_id < 0), só aceita mensagens que sejam reply ao prompt do bot.
+  // Isso contorna o Privacy Mode do Telegram, que esconde mensagens normais do bot.
+  const isGroup = chatId < 0;
+  if (isGroup) {
+    const replyTo = msg?.reply_to_message?.message_id;
+    const expected = session.prompt_message_id;
+    if (!replyTo || (expected && replyTo !== expected)) {
+      return false; // ignora — não é resposta ao nosso prompt
+    }
   }
   const data = session.data || {};
   const flow = session.flow as "dividendo" | "compra" | "venda";
