@@ -101,6 +101,11 @@ const CANCEL_KEYBOARD = {
   inline_keyboard: [[{ text: "❌ Cancelar", callback_data: "flow:cancel" }]],
 };
 
+// ForceReply faz o cliente Telegram abrir o teclado já em modo "responder"
+// à mensagem do bot. Isso garante que, mesmo em grupos com Privacy Mode
+// ATIVO, a resposta do usuário seja entregue ao bot (porque é um reply).
+const FORCE_REPLY = { force_reply: true, selective: true } as const;
+
 function confirmKeyboard() {
   return {
     inline_keyboard: [[
