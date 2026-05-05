@@ -36,14 +36,15 @@ function escapeHtml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-async function sendMessage(chatId: number, text: string, replyMarkup?: any) {
+async function sendMessage(chatId: number, text: string, replyMarkup?: any, replyToMessageId?: number): Promise<number | undefined> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
   const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY")!;
   const body: any = {
     chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true,
   };
   if (replyMarkup) body.reply_markup = replyMarkup;
-  await fetch(`${GATEWAY_URL}/sendMessage`, {
+  if (replyToMessageId) body.reply_to_message_id = replyToMessageId;
+  const r = await fetch(`${GATEWAY_URL}/sendMessage`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -52,6 +53,10 @@ async function sendMessage(chatId: number, text: string, replyMarkup?: any) {
     },
     body: JSON.stringify(body),
   });
+  try {
+    const j = await r.json();
+    return j?.result?.message_id;
+  } catch { return undefined; }
 }
 
 async function answerCallbackQuery(callbackId: string, text?: string) {
