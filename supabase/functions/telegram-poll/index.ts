@@ -337,22 +337,24 @@ async function getSession(admin: any, chatId: number) {
   const { data } = await admin.from("telegram_sessions").select("*").eq("chat_id", chatId).maybeSingle();
   return data;
 }
-async function setSession(admin: any, userId: string, chatId: number, flow: string, step: string, data: any) {
-  await admin.from("telegram_sessions").upsert({
+async function setSession(admin: any, userId: string, chatId: number, flow: string, step: string, data: any, promptMessageId?: number) {
+  const row: any = {
     user_id: userId, chat_id: chatId, flow, step, data,
     updated_at: new Date().toISOString(),
-  }, { onConflict: "chat_id" });
+  };
+  if (promptMessageId !== undefined) row.prompt_message_id = promptMessageId;
+  await admin.from("telegram_sessions").upsert(row, { onConflict: "chat_id" });
 }
 async function clearSession(admin: any, chatId: number) {
   await admin.from("telegram_sessions").delete().eq("chat_id", chatId);
 }
 
 async function startFlow(admin: any, userId: string, chatId: number, flow: "dividendo" | "compra" | "venda") {
-  await setSession(admin, userId, chatId, flow, "ticker", {});
   const label = flow === "dividendo" ? "lançar dividendo" : flow === "compra" ? "registrar compra" : "registrar venda";
-  await sendMessage(chatId,
-    `📝 <b>Vamos ${label}</b>\n\nPasso 1/${flow === "dividendo" ? 3 : 5}: digite o <b>ticker</b> (ex.: MXRF11, BBAS3)`,
-    CANCEL_KEYBOARD);
+  const mid = await sendMessage(chatId,
+    `📝 <b>Vamos ${label}</b>\n\nPasso 1/${flow === "dividendo" ? 3 : 5}: <b>responda esta mensagem</b> com o <b>ticker</b> (ex.: MXRF11, BBAS3).\n\nEnvie /cancelar a qualquer momento.`,
+    FORCE_REPLY);
+  await setSession(admin, userId, chatId, flow, "ticker", {}, mid);
 }
 
 async function handleFlowMessage(admin: any, link: any, chatId: number, text: string): Promise<boolean> {
