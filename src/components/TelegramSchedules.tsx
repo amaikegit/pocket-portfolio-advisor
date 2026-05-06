@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CalendarClock, Plus, Trash2, Send, Pencil, Bell } from "lucide-react";
 import { formatBRDateTime } from "@/lib/brt";
 
-type Kind = "patrimony" | "dividends_month" | "top_movers" | "price_cross";
+type Kind = "patrimony" | "dividends_month" | "top_movers" | "price_cross" | "radar";
 type Mode = "interval" | "daily";
 
 interface ChatRow {
@@ -47,12 +47,14 @@ const KIND_LABEL: Record<Kind, string> = {
   dividends_month: "Dividendos do mês",
   top_movers: "Top movimentações do dia",
   price_cross: "Cruzamento de preço",
+  radar: "Modo Radar (oportunidades, cortes e quedas)",
 };
 const KIND_ICON: Record<Kind, string> = {
   patrimony: "💰",
   dividends_month: "💵",
   top_movers: "📊",
   price_cross: "🎯",
+  radar: "📡",
 };
 
 const WEEKDAYS = [
@@ -71,6 +73,7 @@ const SUGGESTIONS: Array<{ name: string; kind: Kind; mode: Mode; interval_hours?
   { name: "Resumo semanal de dividendos", kind: "dividends_month", mode: "daily", daily_times: ["20:00"], weekdays: [5], description: "Toda sexta às 20h, total de dividendos do mês + meta." },
   { name: "Top movimentações no fechamento", kind: "top_movers", mode: "daily", daily_times: ["18:30"], weekdays: [1,2,3,4,5], description: "3 ativos que mais subiram e mais caíram, após o fechamento do pregão." },
   { name: "Alerta de preço (cruzamento)", kind: "price_cross", mode: "interval", interval_hours: 1, weekdays: [0,1,2,3,4,5,6], description: "Avisa quando o preço atual de um ticker cruza um valor (acima/abaixo)." },
+  { name: "Modo Radar (oportunidades + cortes + quedas)", kind: "radar", mode: "daily", daily_times: ["09:00", "18:30"], weekdays: [1,2,3,4,5], description: "Resumo curto: ativos com oportunidade forte (rating ≥ 4 e abaixo do PM), cortes recentes (rating caiu) e quedas anormais do dia (>3%)." },
 ];
 
 export function TelegramSchedules() {
