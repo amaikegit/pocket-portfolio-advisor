@@ -15,6 +15,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { FII_TYPES, FII_SEGMENTS, isFiiTicker, suggestClassification } from "@/lib/fiiClassification";
+import { STOCK_SECTORS, STOCK_INDUSTRIES, suggestStockClassification } from "@/lib/stockClassification";
+import { getAssetKind } from "@/lib/assetKind";
 import type { Asset } from "@/types/portfolio";
 
 interface AddAssetDialogProps {
@@ -46,11 +48,14 @@ export function AddAssetDialog({ onAdd, trigger }: AddAssetDialogProps) {
     const upper = value.toUpperCase();
     setForm((f) => {
       const next = { ...f, ticker: value };
-      if (isFiiTicker(upper) && !f.fiiType && !f.fiiSegment) {
-        const sug = suggestClassification(upper);
-        if (sug) {
-          next.fiiType = sug.type;
-          next.fiiSegment = sug.segment;
+      if (!f.fiiType && !f.fiiSegment && upper) {
+        const kind = getAssetKind(upper);
+        if (kind === "fii") {
+          const sug = suggestClassification(upper);
+          if (sug) { next.fiiType = sug.type; next.fiiSegment = sug.segment; }
+        } else {
+          const sug = suggestStockClassification(upper);
+          if (sug) { next.fiiType = sug.sector; next.fiiSegment = sug.industry; }
         }
       }
       return next;
@@ -70,7 +75,13 @@ export function AddAssetDialog({ onAdd, trigger }: AddAssetDialogProps) {
     setOpen(false);
   };
 
-  const showFiiFields = isFiiTicker(form.ticker);
+  const tickerKind = form.ticker ? getAssetKind(form.ticker) : null;
+  const showClassifyFields = !!form.ticker.trim();
+  const isFii = tickerKind === "fii";
+  const typeOptions = isFii ? FII_TYPES : STOCK_SECTORS;
+  const segmentOptions = isFii ? FII_SEGMENTS : STOCK_INDUSTRIES;
+  const typeLabel = isFii ? "Tipo (FII)" : "Setor (Ação)";
+  const segmentLabel = isFii ? "Segmento (FII)" : "Subsetor / Indústria";
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -127,23 +138,23 @@ export function AddAssetDialog({ onAdd, trigger }: AddAssetDialogProps) {
             <Input id="pvp" type="number" step="0.01" value={form.pvp || ""}
               onChange={(e) => set("pvp", Number(e.target.value))} />
           </div>
-          {showFiiFields && (
+          {showClassifyFields && (
             <>
               <div className="space-y-1.5">
-                <Label>Tipo (FII)</Label>
+                <Label>{typeLabel}</Label>
                 <Select value={form.fiiType} onValueChange={(v) => set("fiiType", v)}>
                   <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
                   <SelectContent>
-                    {FII_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    {typeOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Segmento (FII)</Label>
+                <Label>{segmentLabel}</Label>
                 <Select value={form.fiiSegment} onValueChange={(v) => set("fiiSegment", v)}>
                   <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
                   <SelectContent>
-                    {FII_SEGMENTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {segmentOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
