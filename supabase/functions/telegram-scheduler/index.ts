@@ -263,6 +263,10 @@ async function buildMessage(admin: any, sched: any): Promise<string | null> {
       `${word} <b>${fmtBRL(threshold)}</b>`;
   }
 
+  if (sched.kind === "radar") {
+    return await buildRadarMessage(admin, sched.user_id);
+  }
+
   return `Tipo de alerta desconhecido: ${sched.kind}`;
 }
 
