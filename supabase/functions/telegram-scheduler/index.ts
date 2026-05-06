@@ -447,6 +447,9 @@ serve(async (req) => {
           `Alvo: ${cfg.direction === "below" ? "abaixo de" : "acima de"} <b>${fmtBRL(Number(cfg.threshold_price ?? 0))}</b>\n` +
           `<i>O alerta dispara apenas quando o preço cruza o alvo.</i>`;
       }
+      if (!text && s.kind === "radar") {
+        text = `<b>📡 Radar — Teste</b>\n\nNenhuma oportunidade, corte ou queda relevante no momento. Em produção, o bot fica silencioso quando não há nada a reportar.`;
+      }
       if (!text) {
         return new Response(JSON.stringify({ ok: false, reason: "no message produced" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
