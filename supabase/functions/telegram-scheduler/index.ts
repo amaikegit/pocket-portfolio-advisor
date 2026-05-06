@@ -270,6 +270,127 @@ async function buildMessage(admin: any, sched: any): Promise<string | null> {
   return `Tipo de alerta desconhecido: ${sched.kind}`;
 }
 
+/**
+ * Modo Radar — varre a carteira procurando:
+ *   1) Oportunidades fortes  → bom valuation + bom yield + preço ≤ PM
+ *   2) Cortes relevantes     → score ruim em ativos com posição significativa
+ *   3) Quedas anormais       → ativo cuja cotação caiu >X% no dia (vs último snapshot)
+ * Só envia mensagem se houver pelo menos 1 item em qualquer bucket.
+ */
+async function buildRadarMessage(admin: any, userId: string): Promise<string | null> {
+  const ABNORMAL_DROP_PCT = 3;          // % no dia
+  const STRONG_DY_MONTHLY = 0.7;        // %
+  const STRONG_PVP_MAX = 1.05;
+  const CUT_PVP_HIGH = 1.4;
+  const CUT_DY_LOW = 0.2;               // %
+  const CUT_LOSS_PCT = 15;              // perda > 15%
+  const MIN_PROPORTION = 3;             // % da carteira
+
+  const [assets, txs] = await Promise.all([
+    fetchAllPaginated<any>(admin, "assets",
+      "ticker, quantity, current_price, average_price, total_invested, dividend_yield, pvp",
+      (q) => q.eq("user_id", userId)),
+    fetchAllPaginated<any>(admin, "transactions",
+      "ticker, type, quantity, price, other_costs, date",
+      (q) => q.eq("user_id", userId)),
+  ]);
+
+  const txByTicker = new Map<string, any[]>();
+  for (const t of txs) {
+    if (!txByTicker.has(t.ticker)) txByTicker.set(t.ticker, []);
+    txByTicker.get(t.ticker)!.push(t);
+  }
+
+  // Total atual da carteira
+  let totalCurrent = 0;
+  const enriched: any[] = [];
+  for (const a of assets) {
+    const tlist = txByTicker.get(a.ticker) ?? [];
+    const { qty, cost } = applyTx(a.quantity, a.total_invested, tlist);
+    if (qty <= 0) continue;
+    const cur = qty * Number(a.current_price);
+    totalCurrent += cur;
+    enriched.push({
+      ticker: a.ticker,
+      qty,
+      cost,
+      currentPrice: Number(a.current_price),
+      averagePrice: Number(a.average_price),
+      dy: Number(a.dividend_yield),
+      pvp: Number(a.pvp),
+      totalCurrent: cur,
+    });
+  }
+  for (const e of enriched) {
+    e.proportion = totalCurrent > 0 ? (e.totalCurrent / totalCurrent) * 100 : 0;
+    e.dyMonthlyPct = e.currentPrice > 0 ? (e.dy / e.currentPrice) * 100 : 0;
+    e.unrealizedPct = e.cost > 0 ? ((e.totalCurrent - e.cost) / e.cost) * 100 : 0;
+    e.priceVsPm = e.averagePrice > 0 ? ((e.currentPrice - e.averagePrice) / e.averagePrice) * 100 : 0;
+  }
+
+  // Snapshot do dia anterior — para detectar queda diária anormal
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: BRT_TZ });
+  // Placeholder map (não temos snapshot por ativo). Usamos proxy: variação acumulada vs PM.
+  // Quando a queda diária real estiver disponível, basta plugar aqui.
+
+  // Buckets
+  const opportunities = enriched.filter((e) =>
+    e.pvp > 0 && e.pvp <= STRONG_PVP_MAX &&
+    e.dyMonthlyPct >= STRONG_DY_MONTHLY &&
+    e.currentPrice <= e.averagePrice * 1.02
+  ).sort((a, b) => b.dyMonthlyPct - a.dyMonthlyPct).slice(0, 5);
+
+  const cuts = enriched.filter((e) =>
+    e.proportion >= MIN_PROPORTION &&
+    (
+      (e.pvp > 0 && e.pvp >= CUT_PVP_HIGH) ||
+      (e.dyMonthlyPct > 0 && e.dyMonthlyPct < CUT_DY_LOW) ||
+      e.unrealizedPct <= -CUT_LOSS_PCT
+    )
+  ).sort((a, b) => a.unrealizedPct - b.unrealizedPct).slice(0, 5);
+
+  const drops = enriched.filter((e) =>
+    e.priceVsPm <= -ABNORMAL_DROP_PCT && e.proportion >= 1
+  ).sort((a, b) => a.priceVsPm - b.priceVsPm).slice(0, 5);
+
+  if (opportunities.length === 0 && cuts.length === 0 && drops.length === 0) {
+    return null; // Radar silencioso quando nada relevante
+  }
+
+  const parts: string[] = ["<b>📡 Radar da Carteira</b>"];
+
+  if (opportunities.length > 0) {
+    parts.push(
+      `\n<b>🟢 Oportunidades fortes</b>\n` +
+      opportunities.map((e) =>
+        `• <b>${escapeHtml(e.ticker)}</b> — DY ${e.dyMonthlyPct.toFixed(2)}%/mês · P/VP ${e.pvp.toFixed(2)} · ${fmtBRL(e.currentPrice)}`
+      ).join("\n")
+    );
+  }
+  if (cuts.length > 0) {
+    parts.push(
+      `\n<b>⚠️ Cortes relevantes</b>\n` +
+      cuts.map((e) => {
+        const reasons: string[] = [];
+        if (e.pvp >= CUT_PVP_HIGH) reasons.push(`P/VP ${e.pvp.toFixed(2)}`);
+        if (e.dyMonthlyPct > 0 && e.dyMonthlyPct < CUT_DY_LOW) reasons.push(`DY ${e.dyMonthlyPct.toFixed(2)}%/mês`);
+        if (e.unrealizedPct <= -CUT_LOSS_PCT) reasons.push(`prejuízo ${e.unrealizedPct.toFixed(1)}%`);
+        return `• <b>${escapeHtml(e.ticker)}</b> (${e.proportion.toFixed(1)}% carteira) — ${reasons.join(" · ")}`;
+      }).join("\n")
+    );
+  }
+  if (drops.length > 0) {
+    parts.push(
+      `\n<b>🔴 Quedas anormais (vs PM)</b>\n` +
+      drops.map((e) =>
+        `• <b>${escapeHtml(e.ticker)}</b> ${e.priceVsPm.toFixed(2)}% · ${fmtBRL(e.currentPrice)}`
+      ).join("\n")
+    );
+  }
+
+  return parts.join("\n");
+}
+
 async function processSchedule(admin: any, sched: any, now: Date) {
   try {
     const text = await buildMessage(admin, sched);
