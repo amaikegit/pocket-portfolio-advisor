@@ -2,8 +2,7 @@ import { useState, useMemo } from "react";
 import { Check, X, ArrowUpDown, ArrowUp, ArrowDown, Filter, Pencil, Trash2, BarChart3, Bookmark, Save, RefreshCw } from "lucide-react";
 import { Asset, AssetCalculated } from "@/types/portfolio";
 import { StarRating } from "@/components/StarRating";
-import { ClassifyFiiDialog } from "@/components/ClassifyFiiDialog";
-import { isFiiTicker } from "@/lib/fiiClassification";
+import { ClassifyAssetDialog } from "@/components/ClassifyAssetDialog";
 import { useTableFilterPresets } from "@/hooks/useTableFilterPresets";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
@@ -541,23 +540,21 @@ export function PortfolioTable({ assets, onRemove, onUpdate }: PortfolioTablePro
                         >
                           <Pencil className="h-3 w-3" /> Editar
                         </Button>
-                        {isFiiTicker(a.ticker) && (
-                          <ClassifyFiiDialog
-                            ticker={a.ticker}
-                            currentType={a.fiiType}
-                            currentSegment={a.fiiSegment}
-                            onSave={(updates) => onUpdate(a.id, updates)}
-                            trigger={
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="w-full justify-start gap-2 h-8 text-xs"
-                              >
-                                <Filter className="h-3 w-3" /> Classificar
-                              </Button>
-                            }
-                          />
-                        )}
+                        <ClassifyAssetDialog
+                          ticker={a.ticker}
+                          currentType={a.fiiType}
+                          currentSegment={a.fiiSegment}
+                          onSave={(updates) => onUpdate(a.id, updates)}
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start gap-2 h-8 text-xs"
+                            >
+                              <Filter className="h-3 w-3" /> Classificar
+                            </Button>
+                          }
+                        />
                         <Button
                           variant="ghost"
                           size="sm"
