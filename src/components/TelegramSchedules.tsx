@@ -428,6 +428,7 @@ export function TelegramSchedules() {
                     <SelectItem value="dividends_month">💵 Dividendos do mês</SelectItem>
                     <SelectItem value="top_movers">📊 Top movimentações</SelectItem>
                     <SelectItem value="price_cross">🎯 Cruzamento de preço (ticker)</SelectItem>
+                    <SelectItem value="radar">📡 Modo Radar (oportunidades + cortes + quedas)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
