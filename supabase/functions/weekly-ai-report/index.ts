@@ -1,11 +1,306 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
+
+// Strip emoji / pictographic chars not supported by jsPDF default fonts.
+function stripEmoji(s: string) {
+  return s
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{2300}-\u{23FF}\u{2700}-\u{27BF}\u{FE0F}]/gu, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function fmtBRL(n: number) {
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+interface ExecMetrics {
+  title: string;
+  dateLabel: string;
+  totalCurrent: number;
+  totalInvested: number;
+  diff: number;
+  rentPct: number;
+  dividendsWeek: number;
+  dividendsCount: number;
+  assetsCount: number;
+}
+
+function buildExecutivePdf(metrics: ExecMetrics, markdown: string): Uint8Array {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 48;
+  const contentW = pageW - marginX * 2;
+
+  // Brand colors
+  const accent: [number, number, number] = [16, 110, 190];
+  const dark: [number, number, number] = [25, 32, 45];
+  const muted: [number, number, number] = [110, 120, 135];
+  const positive: [number, number, number] = [22, 140, 86];
+  const negative: [number, number, number] = [196, 60, 60];
+
+  const drawHeader = () => {
+    doc.setFillColor(...accent);
+    doc.rect(0, 0, pageW, 6, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...muted);
+    doc.text("RELATÓRIO EXECUTIVO • CARTEIRA", marginX, 28);
+    doc.setFont("helvetica", "normal");
+    doc.text(metrics.dateLabel, pageW - marginX, 28, { align: "right" });
+  };
+
+  const drawFooter = (pageNum: number, totalPages?: number) => {
+    doc.setDrawColor(220, 224, 230);
+    doc.setLineWidth(0.5);
+    doc.line(marginX, pageH - 32, pageW - marginX, pageH - 32);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...muted);
+    doc.text("Gerado por IA — uso informativo, não constitui recomendação de investimento.", marginX, pageH - 18);
+    const pg = totalPages ? `Página ${pageNum} de ${totalPages}` : `Página ${pageNum}`;
+    doc.text(pg, pageW - marginX, pageH - 18, { align: "right" });
+  };
+
+  let y = 60;
+  let pageNum = 1;
+  drawHeader();
+
+  const ensureSpace = (h: number) => {
+    if (y + h > pageH - 50) {
+      drawFooter(pageNum);
+      doc.addPage();
+      pageNum++;
+      y = 60;
+      drawHeader();
+    }
+  };
+
+  // ===== Cover block =====
+  doc.setTextColor(...dark);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  const titleLines = doc.splitTextToSize(stripEmoji(metrics.title), contentW);
+  doc.text(titleLines, marginX, (y += 10));
+  y += titleLines.length * 24;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(...muted);
+  doc.text("Visão consolidada da carteira e recomendações de curto prazo.", marginX, (y += 4));
+  y += 22;
+
+  // KPI cards
+  const cardH = 78;
+  const gap = 12;
+  const cardW = (contentW - gap * 2) / 3;
+  const kpis: { label: string; value: string; sub?: string; color?: [number, number, number] }[] = [
+    {
+      label: "Patrimônio Atual",
+      value: fmtBRL(metrics.totalCurrent),
+      sub: `${metrics.assetsCount} ativos`,
+    },
+    {
+      label: "Resultado",
+      value: `${metrics.diff >= 0 ? "+" : ""}${fmtBRL(metrics.diff)}`,
+      sub: `${metrics.rentPct >= 0 ? "+" : ""}${metrics.rentPct.toFixed(2)}% acumulado`,
+      color: metrics.diff >= 0 ? positive : negative,
+    },
+    {
+      label: "Dividendos (7d)",
+      value: fmtBRL(metrics.dividendsWeek),
+      sub: `${metrics.dividendsCount} pagamento(s)`,
+    },
+  ];
+  kpis.forEach((k, i) => {
+    const x = marginX + i * (cardW + gap);
+    doc.setFillColor(247, 249, 252);
+    doc.setDrawColor(225, 230, 238);
+    doc.roundedRect(x, y, cardW, cardH, 6, 6, "FD");
+    doc.setFillColor(...(k.color ?? accent));
+    doc.rect(x, y, 3, cardH, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...muted);
+    doc.text(k.label.toUpperCase(), x + 12, y + 18);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(...(k.color ?? dark));
+    doc.text(k.value, x + 12, y + 42);
+    if (k.sub) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...muted);
+      doc.text(k.sub, x + 12, y + 60);
+    }
+  });
+  y += cardH + 24;
+
+  // ===== Markdown body =====
+  const stripBold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1").replace(/`([^`]+)`/g, "$1");
+
+  const writeWrapped = (text: string, opts: { size: number; bold?: boolean; color?: [number, number, number]; lh?: number; indent?: number }) => {
+    const size = opts.size;
+    const lh = opts.lh ?? size * 1.35;
+    doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+    doc.setFontSize(size);
+    doc.setTextColor(...(opts.color ?? dark));
+    const indent = opts.indent ?? 0;
+    const lines = doc.splitTextToSize(text, contentW - indent);
+    for (const line of lines) {
+      ensureSpace(lh);
+      doc.text(line, marginX + indent, y);
+      y += lh;
+    }
+  };
+
+  const drawSectionTitle = (text: string, level: number) => {
+    y += level === 1 ? 14 : 8;
+    ensureSpace(level === 1 ? 36 : 26);
+    if (level === 1) {
+      doc.setFillColor(...accent);
+      doc.rect(marginX, y - 12, 3, 18, "F");
+      writeWrapped(text, { size: 14, bold: true, indent: 10 });
+    } else {
+      writeWrapped(text, { size: 11.5, bold: true, color: accent });
+    }
+    y += 4;
+  };
+
+  const drawTable = (headers: string[], rows: string[][]) => {
+    const colW = contentW / headers.length;
+    const rowH = 22;
+    ensureSpace(rowH * (rows.length + 1) + 8);
+    // header
+    doc.setFillColor(...accent);
+    doc.rect(marginX, y, contentW, rowH, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(255, 255, 255);
+    headers.forEach((h, i) => doc.text(stripBold(h), marginX + i * colW + 8, y + 15));
+    y += rowH;
+    // rows
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...dark);
+    rows.forEach((r, ri) => {
+      ensureSpace(rowH);
+      if (ri % 2 === 0) {
+        doc.setFillColor(247, 249, 252);
+        doc.rect(marginX, y, contentW, rowH, "F");
+      }
+      r.forEach((c, i) => {
+        const txt = doc.splitTextToSize(stripBold(c), colW - 16)[0] ?? "";
+        doc.text(String(txt), marginX + i * colW + 8, y + 15);
+      });
+      y += rowH;
+    });
+    y += 6;
+  };
+
+  // Parse markdown line by line.
+  const lines = markdown.split(/\r?\n/);
+  let i = 0;
+  while (i < lines.length) {
+    const raw = lines[i];
+    const line = stripEmoji(raw).trimEnd();
+    if (!line.trim()) { y += 4; i++; continue; }
+
+    if (line.startsWith("## ")) {
+      drawSectionTitle(line.replace(/^##\s+/, "").trim(), 1); i++; continue;
+    }
+    if (line.startsWith("### ")) {
+      drawSectionTitle(line.replace(/^###\s+/, "").trim(), 2); i++; continue;
+    }
+    if (line.startsWith("# ")) {
+      drawSectionTitle(line.replace(/^#\s+/, "").trim(), 1); i++; continue;
+    }
+
+    // Table block
+    if (line.trim().startsWith("|") && (lines[i + 1] ?? "").includes("---")) {
+      const headerCells = line.split("|").map((c) => c.trim()).filter(Boolean);
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        const cells = lines[i].split("|").map((c) => stripEmoji(c).trim()).filter((_, idx, arr) => idx > 0 || arr[0] !== "");
+        // re-split clean
+        const clean = lines[i].split("|").slice(1, -1).map((c) => stripEmoji(c).trim());
+        rows.push(clean.length ? clean : cells);
+        i++;
+      }
+      drawTable(headerCells, rows);
+      continue;
+    }
+
+    // Bullets
+    const bullet = line.match(/^\s*[-*]\s+(.*)/);
+    if (bullet) {
+      ensureSpace(16);
+      doc.setFillColor(...accent);
+      doc.circle(marginX + 6, y - 3, 1.8, "F");
+      writeWrapped(stripBold(bullet[1]), { size: 10.5, indent: 16 });
+      i++; continue;
+    }
+    const numbered = line.match(/^\s*(\d+)[.)]\s+(.*)/);
+    if (numbered) {
+      ensureSpace(16);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(...accent);
+      doc.text(`${numbered[1]}.`, marginX, y);
+      writeWrapped(stripBold(numbered[2]), { size: 10.5, indent: 22 });
+      i++; continue;
+    }
+
+    // Paragraph
+    writeWrapped(stripBold(line), { size: 10.5 });
+    i++;
+  }
+
+  drawFooter(pageNum);
+  // Add total page count
+  const total = doc.getNumberOfPages();
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(110, 120, 135);
+    doc.text(`Página ${p} de ${total}`, pageW - marginX, pageH - 18, { align: "right" });
+  }
+
+  const ab = doc.output("arraybuffer") as ArrayBuffer;
+  return new Uint8Array(ab);
+}
+
+async function sendTelegramPdf(chatId: number, pdf: Uint8Array, filename: string, caption: string) {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
+  const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY")!;
+  const form = new FormData();
+  form.append("chat_id", String(chatId));
+  form.append("caption", caption);
+  form.append("parse_mode", "HTML");
+  form.append("document", new Blob([pdf], { type: "application/pdf" }), filename);
+  const r = await fetch(`${GATEWAY_URL}/sendDocument`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "X-Connection-Api-Key": TELEGRAM_API_KEY,
+    },
+    body: form,
+  });
+  if (!r.ok) {
+    const t = await r.text();
+    throw new Error(`sendDocument ${r.status}: ${t.slice(0, 300)}`);
+  }
+}
 
 // Paginated fetch to bypass PostgREST's default 1000-row cap.
 const PAGE_SIZE = 1000;
@@ -285,21 +580,39 @@ Regras de formatação:
             const diff = totalCurrent - totalInvested;
             const pct = totalInvested > 0 ? ((diff / totalInvested) * 100).toFixed(2) : "0.00";
             const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-            // Trim AI content for Telegram (4096 char limit, keep margin)
-            const preview = content.length > 3200 ? content.slice(0, 3200) + "\n\n…" : content;
             const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            const text =
-              `<b>📊 ${escape(title)}</b>\n\n` +
+            const caption =
+              `<b>📊 ${escape(title)}</b>\n` +
               `Patrimônio: <b>${fmt(totalCurrent)}</b>\n` +
               `Resultado: ${fmt(diff)} (${pct}%)\n` +
-              `Dividendos na semana: ${fmt(dividendsWeek)}\n\n` +
-              `<b>Análise IA:</b>\n${escape(preview)}`;
-            await admin.from("telegram_outbox").insert({
-              user_id: u.id,
-              chat_id: link.chat_id,
-              text,
-              parse_mode: "HTML",
-            });
+              `Dividendos (7d): ${fmt(dividendsWeek)}\n\n` +
+              `📎 Relatório executivo em PDF anexo.`;
+
+            try {
+              const pdfBytes = buildExecutivePdf({
+                title,
+                dateLabel: `${dateBR} ${timeBR}`,
+                totalCurrent,
+                totalInvested,
+                diff,
+                rentPct: totalInvested > 0 ? (diff / totalInvested) * 100 : 0,
+                dividendsWeek,
+                dividendsCount: divs?.length ?? 0,
+                assetsCount: assets.length,
+              }, content);
+              const safeDate = dateBR.replace(/\//g, "-");
+              const filename = `relatorio-${reportType}-${safeDate}.pdf`;
+              await sendTelegramPdf(Number(link.chat_id), pdfBytes, filename, caption);
+            } catch (pdfErr) {
+              console.error("telegram pdf send error", pdfErr);
+              // Fallback to text via outbox if PDF send fails
+              await admin.from("telegram_outbox").insert({
+                user_id: u.id,
+                chat_id: link.chat_id,
+                text: caption + `\n\n<i>(Falha ao gerar PDF, enviando resumo)</i>`,
+                parse_mode: "HTML",
+              });
+            }
           }
         } catch (e) {
           console.error("telegram enqueue error", e);
