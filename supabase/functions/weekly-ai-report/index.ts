@@ -580,21 +580,39 @@ Regras de formatação:
             const diff = totalCurrent - totalInvested;
             const pct = totalInvested > 0 ? ((diff / totalInvested) * 100).toFixed(2) : "0.00";
             const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-            // Trim AI content for Telegram (4096 char limit, keep margin)
-            const preview = content.length > 3200 ? content.slice(0, 3200) + "\n\n…" : content;
             const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            const text =
-              `<b>📊 ${escape(title)}</b>\n\n` +
+            const caption =
+              `<b>📊 ${escape(title)}</b>\n` +
               `Patrimônio: <b>${fmt(totalCurrent)}</b>\n` +
               `Resultado: ${fmt(diff)} (${pct}%)\n` +
-              `Dividendos na semana: ${fmt(dividendsWeek)}\n\n` +
-              `<b>Análise IA:</b>\n${escape(preview)}`;
-            await admin.from("telegram_outbox").insert({
-              user_id: u.id,
-              chat_id: link.chat_id,
-              text,
-              parse_mode: "HTML",
-            });
+              `Dividendos (7d): ${fmt(dividendsWeek)}\n\n` +
+              `📎 Relatório executivo em PDF anexo.`;
+
+            try {
+              const pdfBytes = buildExecutivePdf({
+                title,
+                dateLabel: `${dateBR} ${timeBR}`,
+                totalCurrent,
+                totalInvested,
+                diff,
+                rentPct: totalInvested > 0 ? (diff / totalInvested) * 100 : 0,
+                dividendsWeek,
+                dividendsCount: divs?.length ?? 0,
+                assetsCount: assets.length,
+              }, content);
+              const safeDate = dateBR.replace(/\//g, "-");
+              const filename = `relatorio-${reportType}-${safeDate}.pdf`;
+              await sendTelegramPdf(Number(link.chat_id), pdfBytes, filename, caption);
+            } catch (pdfErr) {
+              console.error("telegram pdf send error", pdfErr);
+              // Fallback to text via outbox if PDF send fails
+              await admin.from("telegram_outbox").insert({
+                user_id: u.id,
+                chat_id: link.chat_id,
+                text: caption + `\n\n<i>(Falha ao gerar PDF, enviando resumo)</i>`,
+                parse_mode: "HTML",
+              });
+            }
           }
         } catch (e) {
           console.error("telegram enqueue error", e);
