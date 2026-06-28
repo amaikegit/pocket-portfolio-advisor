@@ -302,6 +302,120 @@ async function sendTelegramPdf(chatId: number, pdf: Uint8Array, filename: string
   }
 }
 
+// ===== Vacancy scraping (Funds Explorer) =====
+const VACANCY_TTL_MS = 24 * 60 * 60 * 1000; // 24h cache
+
+interface VacancyData {
+  ticker: string;
+  fisica: number | null;
+  financeira: number | null;
+  periodo: number | null;
+}
+
+async function scrapeVacancyFromFundsExplorer(ticker: string): Promise<VacancyData | null> {
+  try {
+    const url = `https://www.fundsexplorer.com.br/funds/${ticker.toLowerCase()}`;
+    const r = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+        "Accept-Language": "pt-BR,pt;q=0.9",
+      },
+    });
+    if (!r.ok) return null;
+    const html = await r.text();
+    // Indices vacancia_{N}_vacancia_fisica / financeira / periodo. Pegamos o maior N.
+    const re = /vacancia_(\d+)_vacancia_fisica"\s*:\s*([-\d.]+)/g;
+    let bestN = -1;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(html)) !== null) {
+      const n = Number(m[1]);
+      if (n > bestN) bestN = n;
+    }
+    if (bestN < 0) return { ticker, fisica: null, financeira: null, periodo: null };
+    const pickNum = (field: string): number | null => {
+      const rx = new RegExp(`vacancia_${bestN}_${field}"\\s*:\\s*([-\\d.]+)`);
+      const mm = rx.exec(html);
+      return mm ? Number(mm[1]) : null;
+    };
+    return {
+      ticker,
+      fisica: pickNum("vacancia_fisica"),
+      financeira: pickNum("vacancia_financeira"),
+      periodo: pickNum("periodo") as number | null,
+    };
+  } catch (e) {
+    console.error("vacancy scrape error", ticker, e);
+    return null;
+  }
+}
+
+async function getVacancyForTickers(admin: any, tickers: string[]): Promise<Record<string, VacancyData>> {
+  const out: Record<string, VacancyData> = {};
+  if (!tickers.length) return out;
+  const upper = tickers.map((t) => t.toUpperCase());
+  const { data: cached } = await admin
+    .from("fii_vacancy_cache")
+    .select("ticker, vacancia_fisica, vacancia_financeira, periodo, fetched_at")
+    .in("ticker", upper);
+  const cacheMap = new Map<string, any>((cached ?? []).map((r: any) => [r.ticker, r]));
+  const now = Date.now();
+  const toFetch: string[] = [];
+  for (const t of upper) {
+    const c = cacheMap.get(t);
+    if (c && now - new Date(c.fetched_at).getTime() < VACANCY_TTL_MS) {
+      out[t] = {
+        ticker: t,
+        fisica: c.vacancia_fisica !== null ? Number(c.vacancia_fisica) : null,
+        financeira: c.vacancia_financeira !== null ? Number(c.vacancia_financeira) : null,
+        periodo: c.periodo ?? null,
+      };
+    } else {
+      toFetch.push(t);
+    }
+  }
+  // Limit concurrency to avoid hammering Funds Explorer.
+  const CONCURRENCY = 3;
+  for (let i = 0; i < toFetch.length; i += CONCURRENCY) {
+    const batch = toFetch.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(batch.map((t) => scrapeVacancyFromFundsExplorer(t)));
+    for (let j = 0; j < batch.length; j++) {
+      const t = batch[j];
+      const r = results[j];
+      if (r) {
+        out[t] = r;
+        await admin.from("fii_vacancy_cache").upsert({
+          ticker: t,
+          vacancia_fisica: r.fisica,
+          vacancia_financeira: r.financeira,
+          periodo: r.periodo,
+          fetched_at: new Date().toISOString(),
+        });
+      } else {
+        // Keep stale cache if it exists, otherwise mark unknown
+        const stale = cacheMap.get(t);
+        if (stale) {
+          out[t] = {
+            ticker: t,
+            fisica: stale.vacancia_fisica !== null ? Number(stale.vacancia_fisica) : null,
+            financeira: stale.vacancia_financeira !== null ? Number(stale.vacancia_financeira) : null,
+            periodo: stale.periodo ?? null,
+          };
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function formatPeriodo(p: number | null | undefined): string {
+  if (!p) return "—";
+  const s = String(p);
+  if (s.length === 8) return `${s.slice(6, 8)}/${s.slice(4, 6)}/${s.slice(0, 4)}`;
+  if (s.length === 6) return `${s.slice(4, 6)}/${s.slice(0, 4)}`;
+  return s;
+}
+
 // Paginated fetch to bypass PostgREST's default 1000-row cap.
 const PAGE_SIZE = 1000;
 async function fetchAllPaginated<T = any>(
@@ -440,6 +554,22 @@ serve(async (req) => {
         const top3 = sortedByPct.slice(0, 3);
         const bottom3 = sortedByPct.slice(-3).reverse();
 
+        // Vacância dos FIIs de tijolo
+        const tijolos = assets.filter((a: any) => String(a.fii_type ?? "").toLowerCase() === "tijolo");
+        const vacancyMap = await getVacancyForTickers(admin, tijolos.map((a: any) => a.ticker));
+        const vacanciaTijolos = tijolos
+          .map((a: any) => {
+            const v = vacancyMap[a.ticker.toUpperCase()];
+            return {
+              ticker: a.ticker,
+              segmento: a.fii_segment ?? null,
+              vacanciaFisicaPct: v?.fisica ?? null,
+              vacanciaFinanceiraPct: v?.financeira ?? null,
+              referencia: formatPeriodo(v?.periodo ?? null),
+            };
+          })
+          .sort((a, b) => (b.vacanciaFisicaPct ?? -1) - (a.vacanciaFisicaPct ?? -1));
+
         const portfolioSummary = {
           totalInvested,
           totalCurrent,
@@ -454,6 +584,7 @@ serve(async (req) => {
             detalhes: divs ?? [],
           },
           tendencia30d: snaps ?? [],
+          vacanciaTijolos,
         };
 
         const systemPrompt = `Você é um analista financeiro especialista em FIIs e ações brasileiras.
@@ -483,6 +614,9 @@ Apresente em **tabela markdown** com colunas: Ticker | Variação % | Comentári
 
 ## 🎯 Sugestões de Ação para a Próxima Semana
 Liste de 3 a 5 ações **objetivas, numeradas e acionáveis** (ex: "Avaliar reforço em XPTO11 — DY de X% e P/VP abaixo de 1", "Reavaliar tese de YYYY3 após queda de Z%"). Cada item deve citar o ticker quando aplicável e o motivo em uma frase.
+
+## 🏢 Vacância dos Tijolos
+Se \`vacanciaTijolos\` estiver vazio, escreva apenas "Sem FIIs de tijolo classificados na carteira." Caso contrário, monte uma **tabela markdown** com colunas: Ticker | Segmento | Vacância Física | Vacância Financeira | Referência. Use exatamente os valores de \`vacanciaTijolos\` (formate números com 1 casa decimal e símbolo %; quando o valor for null, escreva "n/d"). Logo após a tabela, escreva 1 frase comentando a vacância média física ponderada e destacando o ticker com maior vacância (risco) e o de menor vacância (destaque positivo).
 
 ## 🔮 Visão para os Próximos Dias
 1-2 frases de fechamento com perspectiva prática.

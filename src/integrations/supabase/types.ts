@@ -173,6 +173,36 @@ export type Database = {
         }
         Relationships: []
       }
+      fii_vacancy_cache: {
+        Row: {
+          created_at: string
+          fetched_at: string
+          periodo: number | null
+          ticker: string
+          updated_at: string
+          vacancia_financeira: number | null
+          vacancia_fisica: number | null
+        }
+        Insert: {
+          created_at?: string
+          fetched_at?: string
+          periodo?: number | null
+          ticker: string
+          updated_at?: string
+          vacancia_financeira?: number | null
+          vacancia_fisica?: number | null
+        }
+        Update: {
+          created_at?: string
+          fetched_at?: string
+          periodo?: number | null
+          ticker?: string
+          updated_at?: string
+          vacancia_financeira?: number | null
+          vacancia_fisica?: number | null
+        }
+        Relationships: []
+      }
       portfolio_snapshots: {
         Row: {
           created_at: string
