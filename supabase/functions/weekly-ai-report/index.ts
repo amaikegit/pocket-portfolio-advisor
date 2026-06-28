@@ -554,6 +554,22 @@ serve(async (req) => {
         const top3 = sortedByPct.slice(0, 3);
         const bottom3 = sortedByPct.slice(-3).reverse();
 
+        // Vacância dos FIIs de tijolo
+        const tijolos = assets.filter((a: any) => String(a.fii_type ?? "").toLowerCase() === "tijolo");
+        const vacancyMap = await getVacancyForTickers(admin, tijolos.map((a: any) => a.ticker));
+        const vacanciaTijolos = tijolos
+          .map((a: any) => {
+            const v = vacancyMap[a.ticker.toUpperCase()];
+            return {
+              ticker: a.ticker,
+              segmento: a.fii_segment ?? null,
+              vacanciaFisicaPct: v?.fisica ?? null,
+              vacanciaFinanceiraPct: v?.financeira ?? null,
+              referencia: formatPeriodo(v?.periodo ?? null),
+            };
+          })
+          .sort((a, b) => (b.vacanciaFisicaPct ?? -1) - (a.vacanciaFisicaPct ?? -1));
+
         const portfolioSummary = {
           totalInvested,
           totalCurrent,
@@ -568,6 +584,7 @@ serve(async (req) => {
             detalhes: divs ?? [],
           },
           tendencia30d: snaps ?? [],
+          vacanciaTijolos,
         };
 
         const systemPrompt = `Você é um analista financeiro especialista em FIIs e ações brasileiras.
@@ -597,6 +614,9 @@ Apresente em **tabela markdown** com colunas: Ticker | Variação % | Comentári
 
 ## 🎯 Sugestões de Ação para a Próxima Semana
 Liste de 3 a 5 ações **objetivas, numeradas e acionáveis** (ex: "Avaliar reforço em XPTO11 — DY de X% e P/VP abaixo de 1", "Reavaliar tese de YYYY3 após queda de Z%"). Cada item deve citar o ticker quando aplicável e o motivo em uma frase.
+
+## 🏢 Vacância dos Tijolos
+Se \`vacanciaTijolos\` estiver vazio, escreva apenas "Sem FIIs de tijolo classificados na carteira." Caso contrário, monte uma **tabela markdown** com colunas: Ticker | Segmento | Vacância Física | Vacância Financeira | Referência. Use exatamente os valores de \`vacanciaTijolos\` (formate números com 1 casa decimal e símbolo %; quando o valor for null, escreva "n/d"). Logo após a tabela, escreva 1 frase comentando a vacância média física ponderada e destacando o ticker com maior vacância (risco) e o de menor vacância (destaque positivo).
 
 ## 🔮 Visão para os Próximos Dias
 1-2 frases de fechamento com perspectiva prática.
